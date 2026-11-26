@@ -84,20 +84,25 @@ Recipe Bedrock:
 - [x] Creative tab + lang
 
 ### Fase 2 — Gameplay lengkap
-- [ ] Persistensi data player (NBT) + reset saat lepas/mati + keep-on-death config
-- [ ] Evolved, effect flip, attack adaptation (pierce armor)
-- [ ] Mode Attack/Balance/Defense + Mode Switcher use logic
-- [ ] Sword: slash (potong block), air blast, dash, purify/cure
-- [ ] Barehand: punch/guard/teleport kick
-- [ ] Seal of Judgment (domain + bind) + Return by Death
-- [ ] Menu settings (Screen) + command `/woa:*`
-- [ ] Sound custom dari RP
+- [x] Persistensi data player (JSON file per-player) + load/save join/leave/tick
+- [x] Evolved (II), effect flip (poison/wither/slowness/dll -> positif)
+- [x] Mode Attack/Balance/Defense + Mode Switcher use logic (klik kanan)
+- [x] Sword: slash (potong block), air blast (sneak+use)
+- [ ] Barehand: punch/guard/teleport kick (nanti)
+- [x] Seal of Judgment (domain sederhana + bind slowness)
+- [ ] Return by Death (nanti)
+- [x] Menu settings (Screen custom Java) + command `/woa:*`
+- [x] Sound custom dari RP (28 .ogg + sounds.json)
+- [ ] Attack adaptation pierce armor (nanti)
+- [ ] Dash / Purify-cure (nanti)
 
-### Fase 3 — Visual
-- [ ] Roda 3D di atas kepala (armor renderer + model dari `.geo.json`)
+### Fase 3 — Visual (kebebasan Java, bukan 1:1 Bedrock)
+- [x] **Slot khusus Wheel** — bukan helm vanilla. Equip lewat Wheel Menu (keybind R / Adaptation Settings / `/woa menu`). Bisa pakai helm lain sambil pakai Wheel.
+- [x] **UI custom Java** — Wheel Menu Screen (slot + mode + adapted list + analysing progress) + HUD emblem + progress bar scan
+- [x] **Animasi scan** — ring particle berputar di atas kepala + beam saat Analysing (server tick)
+- [ ] Roda 3D di atas kepala (feature renderer + model dari `.geo.json`) — pengganti sementara: ring particle + HUD
 - [ ] Animasi spin/seal/rewind, sword slash, barehand
 - [ ] Particle custom (port 271 particle Bedrock → Java)
-- [ ] HUD emblem + progress bar + adaptation list
 - [ ] Armor body texture Mahoraga (layer 1/2)
 
 ### Fase 4 — Polish

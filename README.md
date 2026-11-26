@@ -8,22 +8,29 @@ Mod **Wheel of Adaptation** — portingan Java Fabric dari addon Bedrock [axellp
 
 ---
 
-## 📦 Status Porting — Fase 1 (Core)
+## 📦 Status Porting — Fase 2 + 3 (Gameplay + UI Java)
 
 | Yang sudah ada | Keterangan |
 |---|---|
 | `WheelOfAdaptationMod.java` | Titik masuk mod (ModInitializer) |
-| `ModItems.java` | **Wheel** (helm), **Sword of Extermination**, **Seal of Judgment**, **Mode Switcher**, **Adaptation Settings**, armor **Mahoraga** (chest/legs/boots) |
-| `WheelDamageHandler.java` | Sistem adaptasi dasar: kena damage → Analysing (3 hit) → Adapted → nullify + heal + toast |
-| `AdaptationType/Manager/Data` | Tipe fenomena (fire, lava, explosion, fall, projectile, mob, effect, nature) + data per-player |
-| `ModItemGroups.java` | Creative tab khusus "Wheel of Adaptation" |
-| `WheelOfAdaptationClient.java` | Titik masuk client |
-| Recipe crafting | Sesuai Bedrock: Wheel, Sword, Seal |
-| Texture | Asli dari RP Bedrock (`textures/items/xvoid/*.png`) |
+| `ModItems.java` | **Wheel** (slot khusus, bukan helm), **Sword**, **Seal**, **Mode Switcher**, **Settings**, armor **Mahoraga** |
+| `WheelDamageHandler.java` | Adaptasi: Analysing (3 hit) → Adapted → Evolved (II, +5 hit) → nullify + heal |
+| `WheelTickHandler.java` | Animasi scan (ring particle di kepala) + effect flip + auto-save |
+| `WheelUseHandler.java` | Mode Switcher, Sword slash/air blast, Seal domain, buka menu |
+| `WheelScreenHandler/Screen` | **Slot khusus Wheel** + UI custom (mode, adapted list, progress) |
+| `WheelHud.java` | HUD emblem + progress bar scan (kiri atas) |
+| `WheelCommands.java` | `/woa menu/list/mode/reset/performance/armor/shake` |
+| `ModSounds.java` | 28 sound custom dari RP Bedrock |
+| `AdaptationManager.java` | Persistensi JSON per-player (load join, save leave/tick) |
 
-**Cara coba adaptasi:** pakai Wheel di kepala → kena lava/api/ledakan/mob 3x → muncul toast `Adapting: ... (1/3)` → hit ke-3 jadi `Adapted` → damage tipe itu tidak masuk lagi + heal.
+**Cara coba:**
+1. Craft **Wheel** → tekan **R** (atau klik kanan Adaptation Settings / `/woa menu`) → taruh Wheel di slot khusus
+2. Kena lava/api/mob 3x → lihat ring scan berputar di kepala + HUD progress → jadi `Adapted` → damage tipe itu tidak masuk lagi
+3. Klik kanan **Mode Switcher** → ganti Attack/Balance/Defense
+4. Klik kanan **Sword** → slash (potong block) · sneak+klik kanan → air blast
+5. Klik kanan **Seal** (butuh 3 adapted) → domain bind musuh
 
-Fase 2 (evolved, effect flip, mode, sword slash/air blast/dash, seal domain, RBD, menu, sound) dan Fase 3 (roda 3D di kepala, animasi, particle custom, HUD) menyusul — lihat PORTING.md.
+Perbedaan dari Bedrock (sengaja, karena Java bebas): Wheel pakai **slot khusus** (bisa pakai helm lain), UI **custom Java** (bukan form Bedrock), animasi scan pakai **particle ring** (roda 3D menyusul). Lihat PORTING.md.
 
 Mod ID: `wheel_of_adaptation`  
 Package: `com.wheelofadaptation`  
