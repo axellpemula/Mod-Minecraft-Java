@@ -5,16 +5,16 @@ import com.wheelofadaptation.screen.ModScreenHandlers;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.screen.v1.MenuScreens;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.gui.screens.MenuScreens;
 import org.lwjgl.glfw.GLFW;
 
 public class WheelOfAdaptationClient implements ClientModInitializer {
 
 	public static final KeyMapping OPEN_WHEEL_MENU = new KeyMapping(
 			"key.wheel_of_adaptation.open_menu",
-			KeyMapping.Category.register("key.categories.wheel_of_adaptation"),
-			GLFW.GLFW_KEY_R
+			GLFW.GLFW_KEY_R,
+			"key.categories.wheel_of_adaptation"
 	);
 
 	@Override
@@ -24,6 +24,11 @@ public class WheelOfAdaptationClient implements ClientModInitializer {
 
 		// Screen untuk WheelScreenHandler
 		MenuScreens.register(ModScreenHandlers.WHEEL_MENU, WheelScreen::new);
+
+		// Particle custom (adapt_wheel dari RP Bedrock)
+		net.fabricmc.fabric.api.client.particle.v1.ParticleFactoryRegistry.getInstance()
+				.register(com.wheelofadaptation.particle.ModParticles.ADAPT_WHEEL,
+						AdaptWheelParticle.factory());
 
 		// HUD
 		WheelHud.register();

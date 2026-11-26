@@ -43,8 +43,8 @@ public class WheelHud {
 			// Background panel
 			context.fill(x - 2, y - 2, x + 150, y + 52, 0x80000000);
 
-			// Emblem Wheel 32x32
-			context.blit(WHEEL_TEXTURE, x, y, 0, 0, 32, 32, 32, 32);
+			// Emblem Wheel 32x32 (texture asli 64x64 dari Bedrock, di-scale ke 32px)
+			context.blit(WHEEL_TEXTURE, x, y, 0, 0, 32, 32, 64, 64);
 
 			// Teks
 			int textX = x + 38;

@@ -6,24 +6,21 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * Handler damage untuk sistem adaptasi Wheel (Fase 2).
+ * Handler damage untuk sistem adaptasi Wheel (Fase 3).
  *
- * Alur (dari Bedrock, disesuaikan Java):
- *  - Tidak equip Wheel di slot khusus -> damage normal.
- *  - Equip Wheel + tipe belum adapted -> kena damage, progress Analysing (+1 hit).
- *    Hit ke-3 -> Adapted (toast, particle, sound, heal).
- *  - Equip Wheel + tipe sudah Adapted -> damage di-nullify, heal kecil.
- *    Hit lanjutan -> progress Evolved. Hit ke-5 -> Evolved (II) (efek lebih kuat).
- *
- * Mode:
- *  - DEFENSE: heal nullify lebih besar.
- *  - ATTACK/BALANCE: heal normal.
+ * Alur:
+ *  - Tidak equip Wheel -> damage normal.
+ *  - Lethal damage + RBD ready + adapted>=3 -> Return by Death (cancel damage,
+ *    teleport ke posisi 30 detik lalu, heal 50%, consume 1 adapted, cooldown 60s).
+ *  - Tipe belum adapted -> Analysing (+1 hit). Hit ke-3 -> Adapted.
+ *  - Tipe sudah Adapted -> nullify + heal. Hit lanjutan -> Evolved (II).
  */
 public class WheelDamageHandler {
 
@@ -36,8 +33,18 @@ public class WheelDamageHandler {
 				return true;
 			}
 
-			AdaptationType type = AdaptationType.fromDamageSource(source);
 			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
+
+			// --- Return by Death: cegah lethal damage ---
+			if (player instanceof ServerPlayer serverPlayer
+					&& player.getHealth() - amount <= 0
+					&& data.getAdapted().size() >= 3
+					&& data.isRbdReady(serverPlayer.server.getTickCount())) {
+				doReturnByDeath(serverPlayer, data);
+				return false;
+			}
+
+			AdaptationType type = AdaptationType.fromDamageSource(source);
 
 			// Sudah adapted -> nullify damage
 			if (data.isAdapted(type)) {
@@ -61,7 +68,6 @@ public class WheelDamageHandler {
 						1.0F
 				);
 
-				// Progress Evolved (hanya jika belum evolved)
 				if (!data.isEvolved(type)) {
 					boolean justEvolved = data.recordEvolvedHit(type);
 					if (justEvolved) {
@@ -127,15 +133,66 @@ public class WheelDamageHandler {
 		});
 	}
 
+	private static void doReturnByDeath(ServerPlayer player, PlayerAdaptationData data) {
+		long now = player.server.getTickCount();
+		PlayerAdaptationData.PositionEntry rewind = data.getRewindPosition();
+
+		// Teleport ke posisi 30 detik lalu (jika ada history)
+		if (rewind != null) {
+			ServerLevel targetLevel = player.server.getLevel(
+					net.minecraft.resources.ResourceKey.create(
+							net.minecraft.core.registries.Registries.DIMENSION,
+							net.minecraft.resources.ResourceLocation.parse(rewind.dimension())
+					)
+			);
+			if (targetLevel != null) {
+				player.teleportTo(targetLevel, rewind.x(), rewind.y(), rewind.z(),
+						player.getYRot(), player.getXRot());
+			}
+		}
+
+		// Heal 50% + efek
+		player.setHealth(player.getMaxHealth() * 0.5F);
+		player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 1));
+		player.addEffect(new MobEffectInstance(MobEffects.ABSORPTION, 200, 1));
+
+		// Consume 1 adapted (hapus satu tipe)
+		if (!data.getAdapted().isEmpty()) {
+			AdaptationType toRemove = data.getAdapted().iterator().next();
+			data.getAdapted().remove(toRemove);
+			data.getEvolved().remove(toRemove);
+		}
+
+		data.setRbdCooldown(now);
+		player.displayClientMessage(Component.literal("Return by Death! Adaptations spent"), true);
+		player.level().playSound(null, player.blockPosition(), ModSounds.WHEEL_UNDYING, SoundSource.PLAYERS, 1.0F, 1.0F);
+		player.level().playSound(null, player.blockPosition(), ModSounds.TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
+		spawnAdaptParticles(player, data.isLowFx());
+		WheelOfAdaptationMod.LOGGER.info("Player {} returned by death", player.getName().getString());
+	}
+
 	private static void spawnAdaptParticles(Player player, boolean lowFx) {
 		if (player.level() instanceof ServerLevel serverLevel) {
-			int count = lowFx ? 8 : 20;
+			int count = lowFx ? 3 : 10;
+			// Particle custom adapt_wheel (texture dari RP Bedrock)
+			serverLevel.sendParticles(
+					com.wheelofadaptation.particle.ModParticles.ADAPT_WHEEL,
+					player.getX(),
+					player.getY() + 2.0,
+					player.getZ(),
+					count,
+					0.5,
+					0.5,
+					0.5,
+					0.05
+			);
+			int endRod = lowFx ? 5 : 10;
 			serverLevel.sendParticles(
 					ParticleTypes.END_ROD,
 					player.getX(),
 					player.getY() + 2.0,
 					player.getZ(),
-					count,
+					endRod,
 					0.5,
 					0.5,
 					0.5,

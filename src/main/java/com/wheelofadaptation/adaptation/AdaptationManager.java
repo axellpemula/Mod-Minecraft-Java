@@ -8,7 +8,6 @@ import com.google.gson.JsonObject;
 import com.wheelofadaptation.WheelOfAdaptationMod;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -117,9 +116,7 @@ public class AdaptationManager {
 				}
 			}
 			if (obj.has("hasWheel") && obj.get("hasWheel").getAsBoolean()) {
-				data.setWheelStack(new ItemStack(Items.CLOCK));
-				// Wheel stack disimpan sebagai flag; item asli di-restore sebagai Wheel.
-				// Untuk Fase 2, wheel selalu berupa Wheel item (count 1).
+				// Wheel stack disimpan sebagai flag; item asli di-restore sebagai Wheel (count 1).
 				try {
 					data.setWheelStack(new ItemStack(
 							net.minecraft.core.registries.BuiltInRegistries.ITEM

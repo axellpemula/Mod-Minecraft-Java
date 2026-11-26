@@ -4,7 +4,7 @@ import com.wheelofadaptation.WheelOfAdaptationMod;
 import com.wheelofadaptation.item.ModItems;
 import com.wheelofadaptation.screen.WheelScreenHandler;
 import com.wheelofadaptation.sound.ModSounds;
-import net.fabricmc.fabric.api.event.lifecycle.v1.UseItemCallback;
+import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -27,9 +27,10 @@ import net.minecraft.world.phys.Vec3;
 import java.util.Set;
 
 /**
- * Handler klik kanan (UseItem) untuk item Wheel (Fase 2):
+ * Handler klik kanan (UseItem) untuk item Wheel (Fase 3):
  * - Mode Switcher: ganti mode Attack/Balance/Defense
- * - Sword: Slash (potong entity + block) / Sneak+Use: Air Blast
+ * - Sword: Slash (potong entity + block) / Sneak+Use: Air Blast / Di udara: Dash
+ * - Barehand: Teleport Kick / Sneak+Use: Guard
  * - Seal: Domain sederhana (bind entity di radius)
  * - Adaptation Config: buka Wheel Menu
  */
@@ -76,13 +77,25 @@ public class WheelUseHandler {
 				return InteractionResult.CONSUME;
 			}
 
-			// --- Sword: Slash / Air Blast ---
+			// --- Sword: Slash / Air Blast / Dash ---
 			if (stack.getItem() == ModItems.SWORD_OF_EXTERMINATION) {
 				PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 				if (player.isCrouching()) {
 					airBlast(serverPlayer, data);
+				} else if (!player.onGround()) {
+					dash(serverPlayer);
 				} else {
 					slash(serverPlayer, data);
+				}
+				return InteractionResult.CONSUME;
+			}
+
+			// --- Barehand: Teleport Kick / Guard ---
+			if (stack.getItem() == ModItems.BAREHAND) {
+				if (player.isCrouching()) {
+					guard(serverPlayer);
+				} else {
+					teleportKick(serverPlayer);
 				}
 				return InteractionResult.CONSUME;
 			}
@@ -100,7 +113,7 @@ public class WheelUseHandler {
 	public static void openWheelMenu(ServerPlayer player) {
 		player.openMenu(new MenuProvider() {
 			@Override
-			public AbstractContainerMenu createMenu(int syncId, Inventory inv, net.minecraft.network.FriendlyByteBuf buf) {
+			public AbstractContainerMenu createMenu(int syncId, Inventory inv, Player menuPlayer) {
 				return new WheelScreenHandler(syncId, inv, player);
 			}
 
@@ -236,5 +249,77 @@ public class WheelUseHandler {
 		player.level().playSound(null, player.blockPosition(), ModSounds.SEAL_OPEN, SoundSource.PLAYERS, 1.0F, 1.0F);
 		player.displayClientMessage(Component.literal("Domain open"), true);
 		WheelOfAdaptationMod.LOGGER.info("Player {} opened Seal domain", player.getName().getString());
+	}
+
+	// --- Dash: melesat ke depan (saat di udara + klik kanan Sword) ---
+	private static void dash(ServerPlayer player) {
+		Vec3 look = player.getLookAngle();
+		player.push(look.x * 2.0, 0.2, look.z * 2.0);
+		player.hurtMarked = true;
+		if (player.level() instanceof ServerLevel serverLevel) {
+			for (int i = 0; i < 15; i++) {
+				Vec3 p = player.getEyePosition().subtract(look.scale(i * 0.3));
+				serverLevel.sendParticles(ParticleTypes.WIND_BURST, p.x, p.y, p.z, 1, 0.2, 0.2, 0.2, 0.1);
+			}
+		}
+		player.level().playSound(null, player.blockPosition(), ModSounds.DASH, SoundSource.PLAYERS, 1.0F, 1.0F);
+		player.displayClientMessage(Component.literal("Dash!"), true);
+	}
+
+	// --- Guard: Resistance + slowness sesaat (Barehand sneak+use) ---
+	private static void guard(ServerPlayer player) {
+		player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+				net.minecraft.world.effect.MobEffects.DAMAGE_RESISTANCE, 100, 2));
+		player.addEffect(new net.minecraft.world.effect.MobEffectInstance(
+				net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN, 60, 1));
+		if (player.level() instanceof ServerLevel serverLevel) {
+			serverLevel.sendParticles(
+					ParticleTypes.CLOUD,
+					player.getX(), player.getY() + 1.2, player.getZ(),
+					10, 0.5, 0.5, 0.5, 0.05
+			);
+		}
+		player.level().playSound(null, player.blockPosition(), ModSounds.WHEEL_NULLIFY, SoundSource.PLAYERS, 0.8F, 1.0F);
+		player.displayClientMessage(Component.literal("Guard!"), true);
+	}
+
+	// --- Teleport Kick: teleport ke musuh terdekat + tendang (Barehand use) ---
+	private static void teleportKick(ServerPlayer player) {
+		Entity target = null;
+		double bestDist = 16.0;
+		for (Entity entity : player.level().getEntities(player,
+				player.getBoundingBox().inflate(16.0))) {
+			if (!(entity instanceof LivingEntity) || entity == player) {
+				continue;
+			}
+			double dist = entity.distanceTo(player);
+			if (dist < bestDist) {
+				bestDist = dist;
+				target = entity;
+			}
+		}
+		if (target == null) {
+			player.displayClientMessage(Component.literal("No target in range"), true);
+			return;
+		}
+
+		// Teleport ke posisi target (di belakangnya)
+		Vec3 targetPos = target.getEyePosition();
+		player.teleportTo(targetPos.x, targetPos.y - 1.5, targetPos.z);
+		// Tendang: damage + knockback
+		if (target instanceof LivingEntity living) {
+			living.hurt(player.damageSources().playerAttack(player), 8.0F);
+			Vec3 look = player.getLookAngle();
+			living.push(look.x * 1.5, 0.5, look.z * 1.5);
+		}
+		if (player.level() instanceof ServerLevel serverLevel) {
+			serverLevel.sendParticles(
+					ParticleTypes.CRIT,
+					target.getX(), target.getY() + 1, target.getZ(),
+					10, 0.3, 0.3, 0.3, 0.1
+			);
+		}
+		player.level().playSound(null, player.blockPosition(), ModSounds.TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
+		player.displayClientMessage(Component.literal("Teleport Kick!"), true);
 	}
 }

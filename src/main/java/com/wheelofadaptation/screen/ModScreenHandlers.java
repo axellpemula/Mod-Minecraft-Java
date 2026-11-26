@@ -1,18 +1,23 @@
 package com.wheelofadaptation.screen;
 
-import net.minecraft.world.flag.FeatureSet;
-import net.minecraft.world.inventory.AbstractContainerMenu;
+import com.wheelofadaptation.WheelOfAdaptationMod;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 
 /**
  * ScreenHandlerType untuk Wheel Menu.
+ *
+ * MenuType factory (client) memakai constructor (syncId, inventory, buf).
+ * Server memakai MenuProvider dengan constructor (syncId, inventory, player).
  */
 public class ModScreenHandlers {
 
 	public static final MenuType<WheelScreenHandler> WHEEL_MENU =
-			new MenuType<>(WheelScreenHandler::new, FeatureSet.of());
+			new MenuType<>(WheelScreenHandler::new, FeatureFlags.VANILLA_SET);
 
 	public static void register() {
-		// Type terdaftar via field di atas; method ini untuk konsistensi.
+		Registry.register(BuiltInRegistries.MENU, WheelOfAdaptationMod.id("wheel_menu"), WHEEL_MENU);
 	}
 }

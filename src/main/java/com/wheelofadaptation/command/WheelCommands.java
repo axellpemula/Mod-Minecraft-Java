@@ -25,7 +25,7 @@ import net.minecraft.server.level.ServerPlayer;
 public class WheelCommands {
 
 	public static void register() {
-		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
+		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
 			dispatcher.register(Commands.literal("woa")
 					.then(Commands.literal("menu")
 							.executes(ctx -> {

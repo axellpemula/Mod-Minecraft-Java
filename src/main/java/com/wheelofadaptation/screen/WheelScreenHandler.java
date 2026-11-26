@@ -80,20 +80,20 @@ public class WheelScreenHandler extends AbstractContainerMenu {
 	@Override
 	public void removed(Player player) {
 		super.removed(player);
-		// Simpan wheel dari slot khusus kembali ke data player
-		PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
-		data.setWheelStack(wheelInventory.getItem(0).copy());
-		// Save langsung supaya tidak hilang
-		if (player.getServer() != null) {
-			AdaptationManager.savePlayer(player.getServer(), player.getUUID());
+		// Server-side: simpan wheel dari slot khusus kembali ke data player
+		if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
+			data.setWheelStack(wheelInventory.getItem(0).copy());
+			// Save langsung supaya tidak hilang
+			AdaptationManager.savePlayer(serverLevel.getServer(), player.getUUID());
 		}
 	}
 
 	@Override
 	public void slotsChanged(Container inventory) {
 		super.slotsChanged(inventory);
-		// Sync langsung ke data supaya HUD/damage handler update real-time
-		if (player != null) {
+		// Sync langsung ke data supaya HUD/damage handler update real-time (server-side saja)
+		if (player != null && player.level() instanceof net.minecraft.server.level.ServerLevel) {
 			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 			data.setWheelStack(wheelInventory.getItem(0).copy());
 		}

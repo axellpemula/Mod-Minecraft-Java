@@ -29,6 +29,7 @@ public class ModItemGroups {
 						output.accept(ModItems.MAHORAGA_CHEST);
 						output.accept(ModItems.MAHORAGA_LEGS);
 						output.accept(ModItems.MAHORAGA_BOOTS);
+						output.accept(ModItems.BAREHAND);
 						output.accept(ModItems.ADAPTATION_CONFIG);
 					})
 					.build()

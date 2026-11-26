@@ -1,6 +1,7 @@
 package com.wheelofadaptation;
 
 import com.wheelofadaptation.adaptation.AdaptationManager;
+import com.wheelofadaptation.adaptation.WheelAttackHandler;
 import com.wheelofadaptation.adaptation.WheelDamageHandler;
 import com.wheelofadaptation.adaptation.WheelTickHandler;
 import com.wheelofadaptation.adaptation.WheelUseHandler;
@@ -9,6 +10,7 @@ import com.wheelofadaptation.command.WheelCommands;
 import com.wheelofadaptation.item.ModItems;
 import com.wheelofadaptation.itemgroup.ModItemGroups;
 import com.wheelofadaptation.network.WheelNetworking;
+import com.wheelofadaptation.particle.ModParticles;
 import com.wheelofadaptation.screen.ModScreenHandlers;
 import com.wheelofadaptation.sound.ModSounds;
 import net.fabricmc.api.ModInitializer;
@@ -37,10 +39,12 @@ public class WheelOfAdaptationMod implements ModInitializer {
 		ModBlocks.register();
 		ModItemGroups.register();
 		ModSounds.register();
+		ModParticles.register();
 		ModScreenHandlers.register();
 		WheelDamageHandler.register();
 		WheelTickHandler.register();
 		WheelUseHandler.register();
+		WheelAttackHandler.register();
 		WheelCommands.register();
 		WheelNetworking.register();
 

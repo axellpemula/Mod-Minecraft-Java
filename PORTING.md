@@ -61,17 +61,18 @@ Recipe Bedrock:
 
 | Bedrock | Java Fabric 1.21.1 |
 |---|---|
-| `minecraft:wearable` head | `ArmorItem` + `ArmorItem.Type.HELMET` |
+| `minecraft:wearable` head (Wheel) | **Slot khusus**: `Item` + Wheel Menu (`ItemDisplay` di atas kepala) — bukan helm vanilla |
 | `minecraft:damage` sword | `SwordItem` + `ToolMaterial` |
-| `minecraft:wearable` armor | `ArmorItem` (CHESTPLATE/LEGGINGS/BOOTS) |
+| `minecraft:wearable` armor | `ArmorItem` + `ArmorMaterial` custom Mahoraga (defense sesuai Bedrock) |
 | Script `main.js` (damage, tick, use) | Fabric events: `ServerLivingEntityEvents.ALLOW_DAMAGE`, `UseItemCallback`, `AttackEntityCallback`, tick via `ServerTickEvents` |
-| Attachable 3D di kepala | Custom armor renderer / `ArmorRenderer` + model (Fase 3) |
-| Animasi Bedrock | Animasi Java (keyframe / `LivingEntityRenderer`) — Fase 3 |
-| 271 particle custom | `ParticleTypes` vanilla dulu (Fase 1), particle custom via `ParticleFactory` (Fase 3) |
+| Attachable 3D di kepala | `ItemDisplay` entity + spin per-tick (Fase 3), model penuh (Fase 4) |
+| Animasi Bedrock | Animasi Java (keyframe / `LivingEntityRenderer`) — Fase 4 |
+| 271 particle custom | Particle vanilla + `adapt_wheel` custom via `ParticleFactoryRegistry` (Fase 3) |
 | Sound `.ogg` custom | Copy `.ogg` ke `assets/.../sounds/` + `sounds.json` (Fase 2) |
-| HUD custom + form | Action bar toast dulu (Fase 1), HUD screen + `Screen` menu (Fase 2) |
-| Player data (adaptations) | `PlayerAdaptationData` + simpan ke NBT player (Fase 2) |
-| Command `/woa:*` | Brigadier command Fabric (Fase 2) |
+| HUD custom + form | HUD `HudRenderCallback` + `WheelScreen` menu + action bar (Fase 2/3) |
+| Player data (adaptations) | `PlayerAdaptationData` + JSON per-player di `<world>/wheel_of_adaptation/playerdata/` |
+| Return by Death | History posisi server tick + cooldown di `PlayerAdaptationData` (Fase 3) |
+| Command `/woa:*` | Brigadier command Fabric `/woa` (Fase 2) |
 
 ---
 
@@ -87,26 +88,27 @@ Recipe Bedrock:
 - [x] Persistensi data player (JSON file per-player) + load/save join/leave/tick
 - [x] Evolved (II), effect flip (poison/wither/slowness/dll -> positif)
 - [x] Mode Attack/Balance/Defense + Mode Switcher use logic (klik kanan)
-- [x] Sword: slash (potong block), air blast (sneak+use)
-- [ ] Barehand: punch/guard/teleport kick (nanti)
+- [x] Sword: slash (potong block), air blast (sneak+use), dash (use di udara)
+- [x] Barehand: teleport kick (klik kanan ke target terdekat) + guard (sneak+use: Resistance)
 - [x] Seal of Judgment (domain sederhana + bind slowness)
-- [ ] Return by Death (nanti)
+- [x] Return by Death — lethal damage di-cancel, rewind ke posisi 30 detik lalu, heal 50%, konsumsi 1 adapted, cooldown 60s
 - [x] Menu settings (Screen custom Java) + command `/woa:*`
 - [x] Sound custom dari RP (28 .ogg + sounds.json)
-- [ ] Attack adaptation pierce armor (nanti)
-- [ ] Dash / Purify-cure (nanti)
+- [x] Attack adaptation — pukul musuh 4x (Sword/Barehand + Wheel) → adapted per-entity → bonus damage pierce
+- [x] Purify — Sword hit Zombie Villager → cure jadi Villager
 
 ### Fase 3 — Visual (kebebasan Java, bukan 1:1 Bedrock)
 - [x] **Slot khusus Wheel** — bukan helm vanilla. Equip lewat Wheel Menu (keybind R / Adaptation Settings / `/woa menu`). Bisa pakai helm lain sambil pakai Wheel.
 - [x] **UI custom Java** — Wheel Menu Screen (slot + mode + adapted list + analysing progress) + HUD emblem + progress bar scan
 - [x] **Animasi scan** — ring particle berputar di atas kepala + beam saat Analysing (server tick)
-- [ ] Roda 3D di atas kepala (feature renderer + model dari `.geo.json`) — pengganti sementara: ring particle + HUD
-- [ ] Animasi spin/seal/rewind, sword slash, barehand
-- [ ] Particle custom (port 271 particle Bedrock → Java)
-- [ ] Armor body texture Mahoraga (layer 1/2)
+- [x] **Roda berputar di atas kepala** — `ItemDisplay` Wheel + spin otomatis (pelan idle, cepat saat Analysing, miring saat scan). Model `.geo.json` penuh menyusul di Fase 4.
+- [x] **Particle custom** — `adapt_wheel` (texture 256x256 dari RP Bedrock) via `ParticleFactoryRegistry`, dipakai saat Adapted/Evolved/RBD + scan ring
+- [x] **Armor texture Mahoraga** — `ArmorMaterial` custom (chest 6 / legs 5 / boots 2, sesuai Bedrock) + layer 1/2 dari RP Bedrock
+- [ ] Animasi keyframe penuh (seal/rewind/sword slash)
 
 ### Fase 4 — Polish
-- [ ] Balance vs Bedrock v1.4.0, performance (low/medium/ultra), camera shake
+- [ ] Model `.geo.json` → model Java roda 3D penuh
+- [ ] Balance vs Bedrock v1.4.0, camera shake
 - [ ] Multiplayer test, dedicated server
 - [ ] Release jar + docs
 

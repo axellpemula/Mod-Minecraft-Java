@@ -2,8 +2,12 @@ package com.wheelofadaptation.adaptation;
 
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -12,7 +16,8 @@ import java.util.Set;
  *
  * Bedrock: Analysing -> Adapted -> Evolved (II).
  * Fase 2: + Evolved, + Mode, + Wheel slot khusus, + Settings.
- * Persistensi JSON di AdaptationManager.
+ * Fase 3: + Attack adaptation, + RBD (position history + cooldown).
+ * Persistensi JSON di AdaptationManager (history tidak disimpan).
  */
 public class PlayerAdaptationData {
 
@@ -39,11 +44,31 @@ public class PlayerAdaptationData {
 	private boolean keepOnDeath = false;
 	private boolean lowFx = false;
 
+	// Attack adaptation (Bedrock: pukul musuh berulang -> pierce armor)
+	private final Map<String, Integer> attackHits = new HashMap<>();
+	private final Set<String> attackAdapted = new HashSet<>();
+
+	// Return by Death (RBD): history posisi + cooldown
+	private final Deque<PositionEntry> positionHistory = new ArrayDeque<>();
+	private long rbdCooldownUntilTick = 0;
+
 	/** Hit yang dibutuhkan untuk Adapted. Bedrock pakai tier; Fase 2 pakai 3. */
 	public static final int HITS_TO_ADAPT = 3;
 
 	/** Hit tambahan untuk Evolved. */
 	public static final int HITS_TO_EVOLVE = 5;
+
+	/** Hit serangan untuk Attack Adapted. */
+	public static final int HITS_TO_ATTACK_ADAPT = 4;
+
+	/** Cooldown RBD: 60 detik (1200 tick). */
+	public static final long RBD_COOLDOWN_TICKS = 1200L;
+
+	/** History posisi: simpan tiap 20 tick, simpan 30 detik (30 entry). */
+	public static final int HISTORY_MAX = 30;
+
+	public record PositionEntry(double x, double y, double z, String dimension, long tick) {
+	}
 
 	public boolean hasWheel() {
 		return !wheelStack.isEmpty();
@@ -151,6 +176,57 @@ public class PlayerAdaptationData {
 		adapted.clear();
 		evolved.clear();
 		evolvedHits.clear();
+		attackHits.clear();
+		attackAdapted.clear();
+	}
+
+	// --- Attack adaptation ---
+
+	public boolean isAttackAdapted(String entityType) {
+		return attackAdapted.contains(entityType);
+	}
+
+	public int getAttackHits(String entityType) {
+		return attackHits.getOrDefault(entityType, 0);
+	}
+
+	/** Return true jika hit ini menyelesaikan attack adaptation. */
+	public boolean recordAttackHit(String entityType) {
+		if (attackAdapted.contains(entityType)) {
+			return false;
+		}
+		int next = getAttackHits(entityType) + 1;
+		attackHits.put(entityType, next);
+		if (next >= HITS_TO_ATTACK_ADAPT) {
+			attackAdapted.add(entityType);
+			return true;
+		}
+		return false;
+	}
+
+	// --- RBD ---
+
+	public void recordPosition(double x, double y, double z, String dimension, long tick) {
+		positionHistory.addLast(new PositionEntry(x, y, z, dimension, tick));
+		while (positionHistory.size() > HISTORY_MAX) {
+			positionHistory.removeFirst();
+		}
+	}
+
+	public PositionEntry getRewindPosition() {
+		return positionHistory.peekFirst();
+	}
+
+	public boolean isRbdReady(long currentTick) {
+		return currentTick >= rbdCooldownUntilTick;
+	}
+
+	public void setRbdCooldown(long currentTick) {
+		this.rbdCooldownUntilTick = currentTick + RBD_COOLDOWN_TICKS;
+	}
+
+	public long getRbdCooldownUntilTick() {
+		return rbdCooldownUntilTick;
 	}
 
 	// --- Serialization helpers (untuk JSON persistence) ---

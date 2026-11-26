@@ -8,15 +8,17 @@ Mod **Wheel of Adaptation** — portingan Java Fabric dari addon Bedrock [axellp
 
 ---
 
-## 📦 Status Porting — Fase 2 + 3 (Gameplay + UI Java)
+## 📦 Status Porting — Fase 3 (Gameplay penuh + visual)
 
 | Yang sudah ada | Keterangan |
 |---|---|
 | `WheelOfAdaptationMod.java` | Titik masuk mod (ModInitializer) |
-| `ModItems.java` | **Wheel** (slot khusus, bukan helm), **Sword**, **Seal**, **Mode Switcher**, **Settings**, armor **Mahoraga** |
-| `WheelDamageHandler.java` | Adaptasi: Analysing (3 hit) → Adapted → Evolved (II, +5 hit) → nullify + heal |
-| `WheelTickHandler.java` | Animasi scan (ring particle di kepala) + effect flip + auto-save |
-| `WheelUseHandler.java` | Mode Switcher, Sword slash/air blast, Seal domain, buka menu |
+| `ModItems.java` | **Wheel** (slot khusus), **Sword**, **Seal**, **Mode Switcher**, **Barehand**, **Settings**, armor **Mahoraga** (material custom Bedrock) |
+| `WheelDamageHandler.java` | Adaptasi: Analysing (3 hit) → Adapted → Evolved (II) + **Return by Death** |
+| `WheelTickHandler.java` | **Roda 3D berputar di kepala** (`ItemDisplay`), ring scan particle, effect flip, auto-save |
+| `WheelUseHandler.java` | Mode Switcher, Sword slash/air blast/**dash**, Barehand teleport kick/**guard**, Seal domain |
+| `WheelAttackHandler.java` | Attack adaptation (pierce) + **Purify** zombie villager |
+| `ModParticles.java` + `AdaptWheelParticle` | **Particle custom** `adapt_wheel` (texture RP Bedrock) |
 | `WheelScreenHandler/Screen` | **Slot khusus Wheel** + UI custom (mode, adapted list, progress) |
 | `WheelHud.java` | HUD emblem + progress bar scan (kiri atas) |
 | `WheelCommands.java` | `/woa menu/list/mode/reset/performance/armor/shake` |
@@ -24,13 +26,17 @@ Mod **Wheel of Adaptation** — portingan Java Fabric dari addon Bedrock [axellp
 | `AdaptationManager.java` | Persistensi JSON per-player (load join, save leave/tick) |
 
 **Cara coba:**
-1. Craft **Wheel** → tekan **R** (atau klik kanan Adaptation Settings / `/woa menu`) → taruh Wheel di slot khusus
-2. Kena lava/api/mob 3x → lihat ring scan berputar di kepala + HUD progress → jadi `Adapted` → damage tipe itu tidak masuk lagi
+1. Craft **Wheel** → tekan **R** (atau klik kanan Adaptation Settings / `/woa menu`) → taruh Wheel di slot khusus → roda 3D muncul berputar di atas kepala
+2. Kena lava/api/mob 3x → lihat ring scan berputar + roda makin cepat + HUD progress → jadi `Adapted` → damage tipe itu tidak masuk lagi
 3. Klik kanan **Mode Switcher** → ganti Attack/Balance/Defense
-4. Klik kanan **Sword** → slash (potong block) · sneak+klik kanan → air blast
-5. Klik kanan **Seal** (butuh 3 adapted) → domain bind musuh
+4. Klik kanan **Sword** → slash (potong block) · sneak+klik kanan → air blast · klik kanan di udara → dash
+5. Pukul musuh yang sama 4x dengan **Sword/Barehand** → attack adapted → bonus damage
+6. Klik kanan **Barehand** → teleport kick ke musuh terdekat · sneak+klik kanan → guard
+7. Klik kanan **Seal** (butuh 3 adapted) → domain bind musuh
+8. Kalau mau mati padahal sudah adapted ≥3 → **Return by Death**: teleport ke posisi 30 detik lalu, heal 50%, 1 adapted terpakai (cooldown 60s)
+9. **Sword** hit Zombie Villager → purify (cure jadi Villager)
 
-Perbedaan dari Bedrock (sengaja, karena Java bebas): Wheel pakai **slot khusus** (bisa pakai helm lain), UI **custom Java** (bukan form Bedrock), animasi scan pakai **particle ring** (roda 3D menyusul). Lihat PORTING.md.
+Perbedaan dari Bedrock (sengaja, karena Java bebas): Wheel pakai **slot khusus** + roda 3D `ItemDisplay` di kepala, UI **custom Java** (bukan form Bedrock), **particle custom** `adapt_wheel` dari RP Bedrock, **Return by Death** mekanik baru Java, armor Mahoraga punya **material custom** (chest 6/legs 5/boots 2 persis Bedrock). Lihat PORTING.md.
 
 Mod ID: `wheel_of_adaptation`  
 Package: `com.wheelofadaptation`  
