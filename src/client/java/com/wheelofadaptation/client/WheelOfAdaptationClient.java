@@ -32,11 +32,11 @@ public class WheelOfAdaptationClient implements ClientModInitializer {
 
 		// Camera shake (Fase 4): receiver payload server + decay per tick
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-				com.wheelofadaptation.network.ShakePayload.ID,
+				com.wheelofadaptation.network.ShakePayload.TYPE,
 				(payload, context) -> context.client().execute(() -> WheelShakeState.trigger(payload.intensity()))
 		);
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-				com.wheelofadaptation.network.ShakeConfigPayload.ID,
+				com.wheelofadaptation.network.ShakeConfigPayload.TYPE,
 				(payload, context) -> context.client().execute(() -> WheelShakeState.setEnabled(payload.enabled()))
 		);
 		WheelShakeState.registerTick();

@@ -5,7 +5,7 @@ import com.wheelofadaptation.adaptation.PlayerAdaptationData;
 import com.wheelofadaptation.item.ModItems;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
-import net.minecraft.world.SimpleInventory;
+import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -24,7 +24,7 @@ import net.minecraft.world.item.ItemStack;
  */
 public class WheelScreenHandler extends AbstractContainerMenu {
 
-	private final SimpleInventory wheelInventory = new SimpleInventory(1);
+	private final SimpleContainer wheelInventory = new SimpleContainer(1);
 	private final Player player;
 
 	// Constructor server (dipakai MenuProvider)

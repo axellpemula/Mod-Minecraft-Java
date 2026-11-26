@@ -13,7 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.ItemDisplay;
+import net.minecraft.world.entity.display.ItemDisplay;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Map;
