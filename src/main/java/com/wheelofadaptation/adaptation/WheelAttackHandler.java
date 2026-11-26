@@ -58,7 +58,7 @@ public class WheelAttackHandler {
 			String entityType = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
 					.getKey(entity.getType()).toString();
 			// Nama cantik dari lang file (jalan juga untuk mob custom mod lain — auto-detect)
-			String displayName = entity.getType().getName().getString();
+			String displayName = entity.getType().getDescription().getString();
 			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 
 			if (data.isAttackAdapted(entityType)) {

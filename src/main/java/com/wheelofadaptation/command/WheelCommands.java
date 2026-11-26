@@ -128,7 +128,7 @@ public class WheelCommands {
 			}
 			net.minecraft.world.entity.EntityType<?> type =
 					net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.get(rl);
-			return type.getName().getString();
+			return type.getDescription().getString();
 		} catch (Exception e) {
 			return id;
 		}
