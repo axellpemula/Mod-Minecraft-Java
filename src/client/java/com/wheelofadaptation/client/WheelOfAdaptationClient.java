@@ -1,5 +1,6 @@
 package com.wheelofadaptation.client;
 
+import com.wheelofadaptation.adaptation.AdaptationManager;
 import com.wheelofadaptation.network.OpenWheelMenuPayload;
 import com.wheelofadaptation.screen.ModScreenHandlers;
 import net.fabricmc.api.ClientModInitializer;
