@@ -101,7 +101,7 @@ public class WheelTickHandler {
 				if (data.isAdapted(AdaptationType.EFFECT)) {
 					flipEffect(player, MobEffects.POISON, MobEffects.REGENERATION, 100, 0);
 					flipEffect(player, MobEffects.WITHER, MobEffects.REGENERATION, 100, 0);
-					flipEffect(player, MobEffects.SLOWNESS, MobEffects.MOVEMENT_SPEED, 100, 0);
+					flipEffect(player, MobEffects.MOVEMENT_SLOWDOWN, MobEffects.MOVEMENT_SPEED, 100, 0);
 					flipEffect(player, MobEffects.WEAKNESS, MobEffects.DAMAGE_BOOST, 100, 0);
 					flipEffect(player, MobEffects.BLINDNESS, MobEffects.NIGHT_VISION, 300, 0);
 					flipEffect(player, MobEffects.DARKNESS, MobEffects.NIGHT_VISION, 300, 0);
@@ -111,6 +111,10 @@ public class WheelTickHandler {
 
 			if (doSave) {
 				AdaptationManager.saveAll(server);
+				// Sync data adaptasi ke client supaya HUD + Screen tampil benar
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+					com.wheelofadaptation.adaptation.AdaptationSync.syncTo(player);
+				}
 			}
 		});
 	}

@@ -63,6 +63,7 @@ public class WheelCommands {
 							.executes(ctx -> {
 								ServerPlayer player = ctx.getSource().getPlayerOrException();
 								AdaptationManager.resetAdaptations(player.getUUID());
+								com.wheelofadaptation.adaptation.AdaptationSync.syncTo(player);
 								ctx.getSource().sendSuccess(() -> Component.literal("Adaptations reset"), false);
 								return 1;
 							}))

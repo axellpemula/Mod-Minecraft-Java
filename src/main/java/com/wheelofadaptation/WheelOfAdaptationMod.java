@@ -1,6 +1,7 @@
 package com.wheelofadaptation;
 
 import com.wheelofadaptation.adaptation.AdaptationManager;
+import com.wheelofadaptation.adaptation.AdaptationSync;
 import com.wheelofadaptation.adaptation.WheelAttackHandler;
 import com.wheelofadaptation.adaptation.WheelDamageHandler;
 import com.wheelofadaptation.adaptation.WheelTickHandler;
@@ -48,9 +49,10 @@ public class WheelOfAdaptationMod implements ModInitializer {
 		WheelCommands.register();
 		WheelNetworking.register();
 
-		// Load/save data player
+		// Load/save data player + sync ke client
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			AdaptationManager.loadPlayer(server, handler.getPlayer().getUUID());
+			AdaptationSync.syncTo(handler.getPlayer());
 		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
 			AdaptationManager.savePlayer(server, handler.getPlayer().getUUID());

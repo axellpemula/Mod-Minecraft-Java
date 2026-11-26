@@ -39,6 +39,48 @@ public class WheelOfAdaptationClient implements ClientModInitializer {
 				com.wheelofadaptation.network.ShakeConfigPayload.TYPE,
 				(payload, context) -> context.client().execute(() -> WheelShakeState.setEnabled(payload.enabled()))
 		);
+
+		// Sync data adaptasi dari server -> update data client untuk HUD + Screen
+		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+				com.wheelofadaptation.network.AdaptationSyncPayload.TYPE,
+				(payload, context) -> context.client().execute(() -> {
+					if (context.player() == null) {
+						return;
+					}
+					var data = AdaptationManager.getOrCreate(context.player().getUUID());
+					data.setWheelStack(payload.hasWheel()
+							? new net.minecraft.world.item.ItemStack(com.wheelofadaptation.item.ModItems.WHEEL_OF_ADAPTATION)
+							: net.minecraft.world.item.ItemStack.EMPTY);
+					com.wheelofadaptation.adaptation.WheelMode[] modes = com.wheelofadaptation.adaptation.WheelMode.values();
+					data.setMode(modes[Math.floorMod(payload.modeOrdinal(), modes.length)]);
+					com.wheelofadaptation.adaptation.AdaptationType[] types = com.wheelofadaptation.adaptation.AdaptationType.values();
+
+					java.util.EnumSet<com.wheelofadaptation.adaptation.AdaptationType> adapted =
+							java.util.EnumSet.noneOf(com.wheelofadaptation.adaptation.AdaptationType.class);
+					for (int ord : payload.adaptedOrdinals()) {
+						if (ord >= 0 && ord < types.length) {
+							adapted.add(types[ord]);
+						}
+					}
+					java.util.EnumSet<com.wheelofadaptation.adaptation.AdaptationType> evolved =
+							java.util.EnumSet.noneOf(com.wheelofadaptation.adaptation.AdaptationType.class);
+					for (int ord : payload.evolvedOrdinals()) {
+						if (ord >= 0 && ord < types.length) {
+							evolved.add(types[ord]);
+						}
+					}
+					java.util.EnumMap<com.wheelofadaptation.adaptation.AdaptationType, Integer> hits =
+							new java.util.EnumMap<>(com.wheelofadaptation.adaptation.AdaptationType.class);
+					int[] hitsArr = payload.hitsByOrdinal();
+					for (int i = 0; i < types.length && i < hitsArr.length; i++) {
+						if (hitsArr[i] > 0) {
+							hits.put(types[i], hitsArr[i]);
+						}
+					}
+					data.loadAdapted(adapted, evolved, hits, new java.util.EnumMap<>(com.wheelofadaptation.adaptation.AdaptationType.class));
+				})
+		);
+
 		WheelShakeState.registerTick();
 
 		// HUD

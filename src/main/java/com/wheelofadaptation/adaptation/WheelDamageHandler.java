@@ -96,6 +96,9 @@ public class WheelDamageHandler {
 						if (player instanceof ServerPlayer serverPlayer && !data.isLowFx()) {
 							com.wheelofadaptation.network.WheelNetworking.shake(serverPlayer, 0.6F);
 						}
+						if (player instanceof ServerPlayer syncPlayer) {
+							com.wheelofadaptation.adaptation.AdaptationSync.syncTo(syncPlayer);
+						}
 						WheelOfAdaptationMod.LOGGER.info(
 								"Player {} evolved {} adaptation", player.getName().getString(), type
 						);
@@ -124,6 +127,9 @@ public class WheelDamageHandler {
 				);
 				if (player instanceof ServerPlayer serverPlayer && !data.isLowFx()) {
 					com.wheelofadaptation.network.WheelNetworking.shake(serverPlayer, 0.35F);
+				}
+				if (player instanceof ServerPlayer syncPlayer) {
+					com.wheelofadaptation.adaptation.AdaptationSync.syncTo(syncPlayer);
 				}
 				WheelOfAdaptationMod.LOGGER.info(
 						"Player {} adapted to {}", player.getName().getString(), type
@@ -185,6 +191,7 @@ public class WheelDamageHandler {
 		if (!data.isLowFx()) {
 			com.wheelofadaptation.network.WheelNetworking.shake(player, 1.0F);
 		}
+		com.wheelofadaptation.adaptation.AdaptationSync.syncTo(player);
 		WheelOfAdaptationMod.LOGGER.info("Player {} returned by death", player.getName().getString());
 	}
 

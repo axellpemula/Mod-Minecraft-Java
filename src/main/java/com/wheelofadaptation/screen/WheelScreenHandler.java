@@ -3,7 +3,6 @@ package com.wheelofadaptation.screen;
 import com.wheelofadaptation.adaptation.AdaptationManager;
 import com.wheelofadaptation.adaptation.PlayerAdaptationData;
 import com.wheelofadaptation.item.ModItems;
-import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -39,8 +38,8 @@ public class WheelScreenHandler extends AbstractContainerMenu {
 		initSlots(playerInventory);
 	}
 
-	// Constructor client (dipakai MenuType factory dari network)
-	public WheelScreenHandler(int syncId, Inventory playerInventory, FriendlyByteBuf buf) {
+	// Constructor client (dipakai MenuType factory dari network) — 2 arg (MenuSupplier vanilla)
+	public WheelScreenHandler(int syncId, Inventory playerInventory) {
 		super(ModScreenHandlers.WHEEL_MENU, syncId);
 		this.player = null;
 		initSlots(playerInventory);
@@ -108,11 +107,13 @@ public class WheelScreenHandler extends AbstractContainerMenu {
 	public void removed(Player player) {
 		super.removed(player);
 		// Server-side: simpan wheel dari slot khusus kembali ke data player
-		if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+		if (player.level() instanceof net.minecraft.server.level.ServerLevel serverLevel
+				&& player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
 			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 			data.setWheelStack(wheelInventory.getItem(0).copy());
-			// Save langsung supaya tidak hilang
+			// Save langsung supaya tidak hilang + sync ke client (HUD update)
 			AdaptationManager.savePlayer(serverLevel.getServer(), player.getUUID());
+			com.wheelofadaptation.adaptation.AdaptationSync.syncTo(serverPlayer);
 		}
 	}
 

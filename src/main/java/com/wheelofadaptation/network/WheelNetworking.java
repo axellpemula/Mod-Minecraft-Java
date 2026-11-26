@@ -15,6 +15,7 @@ public class WheelNetworking {
 		PayloadTypeRegistry.playC2S().register(OpenWheelMenuPayload.TYPE, OpenWheelMenuPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ShakePayload.TYPE, ShakePayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(ShakeConfigPayload.TYPE, ShakeConfigPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(AdaptationSyncPayload.TYPE, AdaptationSyncPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(OpenWheelMenuPayload.TYPE, (payload, context) -> {
 			context.server().execute(() -> {

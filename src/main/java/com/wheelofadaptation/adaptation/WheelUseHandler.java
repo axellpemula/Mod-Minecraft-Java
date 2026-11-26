@@ -48,10 +48,10 @@ public class WheelUseHandler {
 		UseItemCallback.EVENT.register((player, world, hand) -> {
 			ItemStack stack = player.getItemInHand(hand);
 			if (world.isClientSide) {
-				return net.minecraft.util.TypedInteractionResult.pass(stack);
+				return net.minecraft.world.InteractionResultHolder.pass(stack);
 			}
 			if (!(player instanceof ServerPlayer serverPlayer)) {
-				return net.minecraft.util.TypedInteractionResult.pass(stack);
+				return net.minecraft.world.InteractionResultHolder.pass(stack);
 			}
 
 			// --- Mode Switcher ---
@@ -59,19 +59,20 @@ public class WheelUseHandler {
 				PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 				if (!data.hasWheel()) {
 					player.displayClientMessage(Component.literal("Equip the Wheel first (press R)"), true);
-					return net.minecraft.util.TypedInteractionResult.consume(stack);
+					return net.minecraft.world.InteractionResultHolder.consume(stack);
 				}
 				WheelMode next = data.getMode().next();
 				data.setMode(next);
+				com.wheelofadaptation.adaptation.AdaptationSync.syncTo(serverPlayer);
 				player.displayClientMessage(Component.literal("Mode: " + next.getDisplayName()), true);
 				player.level().playSound(null, player.blockPosition(), ModSounds.WHEEL_SPIN, SoundSource.PLAYERS, 0.8F, 1.0F);
-				return net.minecraft.util.TypedInteractionResult.consume(stack);
+				return net.minecraft.world.InteractionResultHolder.consume(stack);
 			}
 
 			// --- Adaptation Config: buka menu ---
 			if (stack.getItem() == ModItems.ADAPTATION_CONFIG) {
 				openWheelMenu(serverPlayer);
-				return net.minecraft.util.TypedInteractionResult.consume(stack);
+				return net.minecraft.world.InteractionResultHolder.consume(stack);
 			}
 
 			// --- Sword: Slash / Air Blast / Dash ---
@@ -84,7 +85,7 @@ public class WheelUseHandler {
 				} else {
 					slash(serverPlayer, data);
 				}
-				return net.minecraft.util.TypedInteractionResult.consume(stack);
+				return net.minecraft.world.InteractionResultHolder.consume(stack);
 			}
 
 			// --- Barehand: Teleport Kick / Guard ---
@@ -94,16 +95,16 @@ public class WheelUseHandler {
 				} else {
 					teleportKick(serverPlayer);
 				}
-				return net.minecraft.util.TypedInteractionResult.consume(stack);
+				return net.minecraft.world.InteractionResultHolder.consume(stack);
 			}
 
 			// --- Seal of Judgment ---
 			if (stack.getItem() == ModItems.SEAL_OF_JUDGMENT) {
 				seal(serverPlayer);
-				return net.minecraft.util.TypedInteractionResult.consume(stack);
+				return net.minecraft.world.InteractionResultHolder.consume(stack);
 			}
 
-			return net.minecraft.util.TypedInteractionResult.pass(stack);
+			return net.minecraft.world.InteractionResultHolder.pass(stack);
 		});
 	}
 
