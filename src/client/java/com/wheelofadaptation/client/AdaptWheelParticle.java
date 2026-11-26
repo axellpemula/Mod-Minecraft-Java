@@ -2,7 +2,6 @@ package com.wheelofadaptation.client;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.TextureSheetParticle;
@@ -22,7 +21,6 @@ public class AdaptWheelParticle extends TextureSheetParticle {
 		this.lifetime = 20 + this.random.nextInt(15);
 		this.gravity = -0.02F; // terangkat pelan
 		this.quadSize = 0.45F;
-		this.hasPhysics = false;
 		this.collidesWithWorld = false;
 		this.setSpriteFromAge(sprites);
 		this.roll = this.random.nextFloat() * (float) (Math.PI * 2.0);
@@ -44,11 +42,5 @@ public class AdaptWheelParticle extends TextureSheetParticle {
 	@Override
 	public ParticleRenderType getRenderType() {
 		return ParticleRenderType.PARTICLE_SHEET_TRANSLUCENT;
-	}
-
-	/** Factory untuk ParticleFactoryRegistry. */
-	public static ParticleEngine.SpriteParticleRegistration<net.minecraft.core.particles.SimpleParticleType> factory() {
-		return sprites -> (type, level, x, y, z, vx, vy, vz) ->
-				new AdaptWheelParticle(level, x, y, z, vx, vy, vz, sprites);
 	}
 }

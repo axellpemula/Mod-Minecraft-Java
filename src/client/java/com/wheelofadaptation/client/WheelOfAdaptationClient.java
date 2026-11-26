@@ -26,10 +26,11 @@ public class WheelOfAdaptationClient implements ClientModInitializer {
 		// Screen untuk WheelScreenHandler
 		MenuScreens.register(ModScreenHandlers.WHEEL_MENU, WheelScreen::new);
 
-		// Particle custom (adapt_wheel dari RP Bedrock)
+		// Particle custom (adapt_wheel dari RP Bedrock) — lambda inline, tanpa interface private vanilla
 		net.fabricmc.fabric.api.client.particle.v1.ParticleFactoryRegistry.getInstance()
 				.register(com.wheelofadaptation.particle.ModParticles.ADAPT_WHEEL,
-						AdaptWheelParticle.factory());
+						sprites -> (type, level, x, y, z, vx, vy, vz) ->
+								new AdaptWheelParticle(level, x, y, z, vx, vy, vz, sprites));
 
 		// Camera shake (Fase 4): receiver payload server + decay per tick
 		net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
