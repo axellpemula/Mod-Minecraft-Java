@@ -21,4 +21,8 @@ public class ModParticles {
 		return net.minecraft.core.Registry.register(BuiltInRegistries.PARTICLE_TYPE, id, new SimpleParticleType(false) {
 		});
 	}
+
+	public static void register() {
+		WheelOfAdaptationMod.LOGGER.info("Registering particles for " + WheelOfAdaptationMod.MOD_ID);
+	}
 }
