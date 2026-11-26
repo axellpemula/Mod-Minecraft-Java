@@ -1,6 +1,6 @@
 {
 	"parent": "minecraft:item/generated",
 	"textures": {
-		"layer0": "minecraft:item/compass"
+		"layer0": "wheel_of_adaptation:item/seal_of_judgment"
 	}
 }

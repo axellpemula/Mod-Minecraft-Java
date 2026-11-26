@@ -2,23 +2,28 @@
 
 > Project Untuk mod minecraft java fabric versi 1.21.1+
 
-Mod **Wheel of Adaptation** — putar roda, terima adaptasi, bertahan hidup dengan cara baru!
+Mod **Wheel of Adaptation** — portingan Java Fabric dari addon Bedrock [axellpemula/Wheel-of-Adaptation](https://github.com/axellpemula/Wheel-of-Adaptation) v1.4.0 (Mahoraga's Dharma Wheel, Jujutsu Kaisen).
 
-Template Fabric 1.21.1 yang siap build, dengan contoh 1 item + 1 block supaya langsung bisa dicoba.
+> Detail analisis addon + roadmap porting ada di **[PORTING.md](PORTING.md)**.
 
 ---
 
-## 📦 Isi Template Ini
+## 📦 Status Porting — Fase 1 (Core)
 
 | Yang sudah ada | Keterangan |
 |---|---|
 | `WheelOfAdaptationMod.java` | Titik masuk mod (ModInitializer) |
-| `ModItems.java` | Contoh item: **Adaptation Wheel** |
-| `ModBlocks.java` | Contoh block: **Adaptation Pedestal** |
+| `ModItems.java` | **Wheel** (helm), **Sword of Extermination**, **Seal of Judgment**, **Mode Switcher**, **Adaptation Settings**, armor **Mahoraga** (chest/legs/boots) |
+| `WheelDamageHandler.java` | Sistem adaptasi dasar: kena damage → Analysing (3 hit) → Adapted → nullify + heal + toast |
+| `AdaptationType/Manager/Data` | Tipe fenomena (fire, lava, explosion, fall, projectile, mob, effect, nature) + data per-player |
 | `ModItemGroups.java` | Creative tab khusus "Wheel of Adaptation" |
 | `WheelOfAdaptationClient.java` | Titik masuk client |
-| Recipe crafting | Adaptation Wheel & Pedestal bisa di-craft |
-| Model + lang | Pakai texture vanilla dulu (compass & stone) sebagai placeholder |
+| Recipe crafting | Sesuai Bedrock: Wheel, Sword, Seal |
+| Texture | Asli dari RP Bedrock (`textures/items/xvoid/*.png`) |
+
+**Cara coba adaptasi:** pakai Wheel di kepala → kena lava/api/ledakan/mob 3x → muncul toast `Adapting: ... (1/3)` → hit ke-3 jadi `Adapted` → damage tipe itu tidak masuk lagi + heal.
+
+Fase 2 (evolved, effect flip, mode, sword slash/air blast/dash, seal domain, RBD, menu, sound) dan Fase 3 (roda 3D di kepala, animasi, particle custom, HUD) menyusul — lihat PORTING.md.
 
 Mod ID: `wheel_of_adaptation`  
 Package: `com.wheelofadaptation`  

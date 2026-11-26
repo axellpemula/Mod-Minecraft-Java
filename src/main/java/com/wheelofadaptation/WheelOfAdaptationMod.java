@@ -1,5 +1,6 @@
 package com.wheelofadaptation;
 
+import com.wheelofadaptation.adaptation.WheelDamageHandler;
 import com.wheelofadaptation.block.ModBlocks;
 import com.wheelofadaptation.item.ModItems;
 import com.wheelofadaptation.itemgroup.ModItemGroups;
@@ -22,11 +23,12 @@ public class WheelOfAdaptationMod implements ModInitializer {
 		// Tapi beberapa hal (seperti resources) mungkin belum ter-initialize.
 		// Jadi hati-hati ya.
 
-		LOGGER.info("Wheel of Adaptation loaded! Selamat datang di dunia adaptasi!");
+		LOGGER.info("Wheel of Adaptation loaded! Mahoraga's Dharma Wheel siap beradaptasi!");
 
 		ModItems.register();
 		ModBlocks.register();
 		ModItemGroups.register();
+		WheelDamageHandler.register();
 	}
 
 	public static ResourceLocation id(String path) {

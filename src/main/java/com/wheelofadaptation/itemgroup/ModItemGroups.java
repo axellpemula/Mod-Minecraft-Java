@@ -1,7 +1,6 @@
 package com.wheelofadaptation.itemgroup;
 
 import com.wheelofadaptation.WheelOfAdaptationMod;
-import com.wheelofadaptation.block.ModBlocks;
 import com.wheelofadaptation.item.ModItems;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.core.Registry;
@@ -11,8 +10,8 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Creative tab khusus untuk mod Wheel of Adaptation.
- * Semua item & block mod ini akan muncul di tab ini di Creative Inventory.
+ * Creative tab khusus Wheel of Adaptation.
+ * Urutan sesuai addon Bedrock: Wheel, Sword, Seal, Switcher, Armor, Config.
  */
 public class ModItemGroups {
 
@@ -21,11 +20,16 @@ public class ModItemGroups {
 			WheelOfAdaptationMod.id("wheel_of_adaptation_group"),
 			FabricItemGroup.builder()
 					.title(Component.translatable("itemGroup.wheel_of_adaptation.wheel_of_adaptation_group"))
-					.icon(() -> new ItemStack(ModItems.ADAPTATION_WHEEL))
+					.icon(() -> new ItemStack(ModItems.WHEEL_OF_ADAPTATION))
 					.displayItems((parameters, output) -> {
-						output.accept(ModItems.ADAPTATION_WHEEL);
-						output.accept(ModBlocks.ADAPTATION_PEDESTAL);
-						// Tambah item/block lain di sini supaya muncul di creative tab
+						output.accept(ModItems.WHEEL_OF_ADAPTATION);
+						output.accept(ModItems.SWORD_OF_EXTERMINATION);
+						output.accept(ModItems.SEAL_OF_JUDGMENT);
+						output.accept(ModItems.MODE_SWITCHER);
+						output.accept(ModItems.MAHORAGA_CHEST);
+						output.accept(ModItems.MAHORAGA_LEGS);
+						output.accept(ModItems.MAHORAGA_BOOTS);
+						output.accept(ModItems.ADAPTATION_CONFIG);
 					})
 					.build()
 	);
