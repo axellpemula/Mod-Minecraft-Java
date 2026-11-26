@@ -17,6 +17,8 @@ public class ModParticles {
 
 	private static SimpleParticleType register(String name) {
 		ResourceLocation id = ResourceLocation.fromNamespaceAndPath(WheelOfAdaptationMod.MOD_ID, name);
-		return net.minecraft.core.Registry.register(BuiltInRegistries.PARTICLE_TYPE, id, new SimpleParticleType(false));
+		// SimpleParticleType ctor protected -> pakai anonymous subclass (pola umum mod Fabric)
+		return net.minecraft.core.Registry.register(BuiltInRegistries.PARTICLE_TYPE, id, new SimpleParticleType(false) {
+		});
 	}
 }

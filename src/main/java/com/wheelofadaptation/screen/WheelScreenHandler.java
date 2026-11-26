@@ -78,6 +78,33 @@ public class WheelScreenHandler extends AbstractContainerMenu {
 	}
 
 	@Override
+	public ItemStack quickMoveStack(Player player, int index) {
+		Slot slot = this.slots.get(index);
+		if (slot == null || !slot.hasItem()) {
+			return ItemStack.EMPTY;
+		}
+		ItemStack stack = slot.getItem();
+		ItemStack original = stack.copy();
+		if (index == 0) {
+			// Dari slot khusus Wheel ke inventory player
+			if (!this.moveItemStackTo(stack, 1, this.slots.size(), true)) {
+				return ItemStack.EMPTY;
+			}
+		} else {
+			// Dari inventory player ke slot khusus Wheel
+			if (!this.moveItemStackTo(stack, 0, 1, false)) {
+				return ItemStack.EMPTY;
+			}
+		}
+		if (stack.isEmpty()) {
+			slot.set(ItemStack.EMPTY);
+		} else {
+			slot.setChanged();
+		}
+		return original;
+	}
+
+	@Override
 	public void removed(Player player) {
 		super.removed(player);
 		// Server-side: simpan wheel dari slot khusus kembali ke data player

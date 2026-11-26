@@ -7,7 +7,6 @@ import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.SwordItem;
-import net.minecraft.world.item.ToolMaterials;
 
 /**
  * Semua item Wheel of Adaptation (portingan dari addon Bedrock
@@ -32,10 +31,10 @@ public class ModItems {
 	);
 
 	// Sword of Extermination — pedang Mahoraga. Bedrock: damage 8.
-	// Java Netherite sword = damage 8, jadi pas untuk Fase 1.
+	// Java Netherite sword = damage 8, jadi pas untuk Fase 1. (Mojang: Tiers, bukan ToolMaterials)
 	public static final Item SWORD_OF_EXTERMINATION = register(
 			new SwordItem(
-					ToolMaterials.NETHERITE,
+					net.minecraft.world.item.Tiers.NETHERITE,
 					new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)
 			),
 			"sword_of_extermination"

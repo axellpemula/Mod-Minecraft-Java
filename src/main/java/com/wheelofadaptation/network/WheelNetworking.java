@@ -12,9 +12,9 @@ import net.minecraft.server.level.ServerPlayer;
 public class WheelNetworking {
 
 	public static void register() {
-		PayloadTypeRegistry.playC2SPayloads().register(OpenWheelMenuPayload.TYPE, OpenWheelMenuPayload.CODEC);
-		PayloadTypeRegistry.playS2CPayloads().register(ShakePayload.TYPE, ShakePayload.CODEC);
-		PayloadTypeRegistry.playS2CPayloads().register(ShakeConfigPayload.TYPE, ShakeConfigPayload.CODEC);
+		PayloadTypeRegistry.playC2S().register(OpenWheelMenuPayload.TYPE, OpenWheelMenuPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(ShakePayload.TYPE, ShakePayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(ShakeConfigPayload.TYPE, ShakeConfigPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(OpenWheelMenuPayload.TYPE, (payload, context) -> {
 			context.server().execute(() -> {

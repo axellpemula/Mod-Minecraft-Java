@@ -12,8 +12,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.display.ItemDisplay;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Map;
@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Tick handler server (Fase 3/4):
- * - Roda 3D: ItemDisplay Wheel di atas kepala (model 3D emas, spin pelan idle, cepat saat Analysing).
+ * - Roda 3D: Display.ItemDisplay Wheel di atas kepala (model 3D emas, spin pelan idle, cepat saat Analysing).
  * - Animasi scan: ring particle berputar di atas kepala saat Analysing.
  * - Effect flip: efek negatif -> positif jika sudah adapted ke EFFECT.
  * - Record posisi untuk RBD tiap 20 tick.
@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WheelTickHandler {
 
 	private static int tickCounter = 0;
-	private static final Map<UUID, ItemDisplay> WHEEL_DISPLAYS = new ConcurrentHashMap<>();
+	private static final Map<UUID, Display.ItemDisplay> WHEEL_DISPLAYS = new ConcurrentHashMap<>();
 
 	public static void register() {
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -117,7 +117,7 @@ public class WheelTickHandler {
 
 	private static void updateWheelDisplay(ServerPlayer player, boolean hasWheel, PlayerAdaptationData data) {
 		UUID id = player.getUUID();
-		ItemDisplay display = WHEEL_DISPLAYS.get(id);
+		Display.ItemDisplay display = WHEEL_DISPLAYS.get(id);
 
 		if (!hasWheel) {
 			if (display != null && !display.isRemoved()) {
@@ -130,7 +130,7 @@ public class WheelTickHandler {
 		// Buat display jika belum ada / sudah terbuang.
 		// Roda 3D emas (model elements) di-scale 0.35 + recenter, jadi pas mengambang di atas kepala.
 		if (display == null || display.isRemoved()) {
-			display = new ItemDisplay(EntityType.ITEM_DISPLAY, player.level());
+			display = new Display.ItemDisplay(EntityType.ITEM_DISPLAY, player.level());
 			spawnConfigured(display, player.getX(), player.getY() + 2.5, player.getZ());
 			player.level().addFreshEntity(display);
 			WHEEL_DISPLAYS.put(id, display);
@@ -152,11 +152,11 @@ public class WheelTickHandler {
 	}
 
 	/**
-	 * Konfigurasi ItemDisplay via NBT (API vanilla yang stabil di 1.21.1):
+	 * Konfigurasi Display.ItemDisplay via NBT (API vanilla yang stabil di 1.21.1):
 	 * item Wheel, context none, transformation scale 0.35 + recenter.
 	 * Fallback: sprite flat tanpa transformasi.
 	 */
-	private static void spawnConfigured(ItemDisplay display, double x, double y, double z) {
+	private static void spawnConfigured(Display.ItemDisplay display, double x, double y, double z) {
 		CompoundTag nbt = new CompoundTag();
 
 		ListTag pos = new ListTag();
