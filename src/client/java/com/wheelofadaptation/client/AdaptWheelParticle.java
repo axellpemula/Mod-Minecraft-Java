@@ -21,7 +21,6 @@ public class AdaptWheelParticle extends TextureSheetParticle {
 		this.lifetime = 20 + this.random.nextInt(15);
 		this.gravity = -0.02F; // terangkat pelan
 		this.quadSize = 0.45F;
-		this.collidesWithWorld = false;
 		this.setSpriteFromAge(sprites);
 		this.roll = this.random.nextFloat() * (float) (Math.PI * 2.0);
 		this.oRoll = this.roll;
