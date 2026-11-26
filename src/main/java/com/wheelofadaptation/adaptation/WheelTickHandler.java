@@ -4,6 +4,10 @@ import com.wheelofadaptation.WheelOfAdaptationMod;
 import com.wheelofadaptation.item.ModItems;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
+import net.minecraft.nbt.FloatTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -17,9 +21,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tick handler server (Fase 2/3):
+ * Tick handler server (Fase 3/4):
+ * - Roda 3D: ItemDisplay Wheel di atas kepala (model 3D emas, spin pelan idle, cepat saat Analysing).
  * - Animasi scan: ring particle berputar di atas kepala saat Analysing.
- * - Roda 3D: ItemDisplay Wheel di atas kepala (idle pelan, spin cepat saat Analysing).
  * - Effect flip: efek negatif -> positif jika sudah adapted ke EFFECT.
  * - Record posisi untuk RBD tiap 20 tick.
  * - Auto-save data tiap 100 tick.
@@ -124,12 +128,10 @@ public class WheelTickHandler {
 		}
 
 		// Buat display jika belum ada / sudah terbuang.
-		// Transformasi default (context NONE) = sprite flat menghadap atas;
-		// kombinasi setYRot tiap tick memberi efek roda berputar.
+		// Roda 3D emas (model elements) di-scale 0.35 + recenter, jadi pas mengambang di atas kepala.
 		if (display == null || display.isRemoved()) {
 			display = new ItemDisplay(EntityType.ITEM_DISPLAY, player.level());
-			display.setItemStack(new ItemStack(ModItems.WHEEL_OF_ADAPTATION));
-			display.setPos(player.getX(), player.getY() + 2.5, player.getZ());
+			spawnConfigured(display, player.getX(), player.getY() + 2.5, player.getZ());
 			player.level().addFreshEntity(display);
 			WHEEL_DISPLAYS.put(id, display);
 			WheelOfAdaptationMod.LOGGER.debug("Spawned wheel display for {}", player.getName().getString());
@@ -147,6 +149,63 @@ public class WheelTickHandler {
 		display.setPos(player.getX(), player.getY() + 2.5, player.getZ());
 		display.setYRot((tickCounter * speed) % 360.0F);
 		display.setXRot(analysing ? 30.0F : 0.0F);
+	}
+
+	/**
+	 * Konfigurasi ItemDisplay via NBT (API vanilla yang stabil di 1.21.1):
+	 * item Wheel, context none, transformation scale 0.35 + recenter.
+	 * Fallback: sprite flat tanpa transformasi.
+	 */
+	private static void spawnConfigured(ItemDisplay display, double x, double y, double z) {
+		CompoundTag nbt = new CompoundTag();
+
+		ListTag pos = new ListTag();
+		pos.add(DoubleTag.valueOf(x));
+		pos.add(DoubleTag.valueOf(y));
+		pos.add(DoubleTag.valueOf(z));
+		nbt.put("Pos", pos);
+		nbt.put("Motion", new ListTag());
+		nbt.put("Rotation", new ListTag());
+
+		CompoundTag itemTag = new CompoundTag();
+		itemTag.putString("id", WheelOfAdaptationMod.MOD_ID + ":wheel_of_adaptation");
+		itemTag.putInt("count", 1);
+		nbt.put("item", itemTag);
+		nbt.putString("display_context", "none");
+
+		CompoundTag tr = new CompoundTag();
+		tr.put("scale", floats(0.35F, 0.35F, 0.35F));
+		// Recenter: model pusat (8,8,8) px = 0.5 block; setelah scale 0.35 -> offset 0.175
+		tr.put("translation", floats(-0.175F, -0.175F, -0.175F));
+		tr.put("left_rotation", identityRotation());
+		tr.put("right_rotation", identityRotation());
+		nbt.put("transformation", tr);
+
+		try {
+			display.load(nbt);
+		} catch (Exception e) {
+			WheelOfAdaptationMod.LOGGER.warn("Failed to configure wheel display NBT, using fallback", e);
+		}
+		if (display.getItemStack().isEmpty()) {
+			display.setItemStack(new ItemStack(ModItems.WHEEL_OF_ADAPTATION));
+			display.setPos(x, y, z);
+		}
+	}
+
+	private static ListTag floats(float x, float y, float z) {
+		ListTag list = new ListTag();
+		list.add(FloatTag.valueOf(x));
+		list.add(FloatTag.valueOf(y));
+		list.add(FloatTag.valueOf(z));
+		return list;
+	}
+
+	private static CompoundTag identityRotation() {
+		CompoundTag rot = new CompoundTag();
+		rot.putFloat("angle", 0.0F);
+		rot.put("axis", floats(0.0F, 1.0F, 0.0F));
+		rot.put("origin", floats(0.0F, 0.0F, 0.0F));
+		return rot;
 	}
 
 	private static void flipEffect(ServerPlayer player,

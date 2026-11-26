@@ -1,23 +1,36 @@
 package com.wheelofadaptation.network;
 
-import com.wheelofadaptation.adaptation.WheelUseHandler;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Registrasi networking Wheel (keybind -> server buka menu).
+ * Registrasi networking Wheel (Fase 2/4):
+ * - C2S: open_menu (keybind R -> server buka menu)
+ * - S2C: shake (camera shake saat Adapted/Evolved/RBD/Seal), shake_config (/woa shake)
  */
 public class WheelNetworking {
 
 	public static void register() {
 		PayloadTypeRegistry.playC2SPayloads().register(OpenWheelMenuPayload.ID, OpenWheelMenuPayload.CODEC);
+		PayloadTypeRegistry.playS2CPayloads().register(ShakePayload.ID, ShakePayload.CODEC);
+		PayloadTypeRegistry.playS2CPayloads().register(ShakeConfigPayload.ID, ShakeConfigPayload.CODEC);
 
 		ServerPlayNetworking.registerGlobalReceiver(OpenWheelMenuPayload.ID, (payload, context) -> {
 			context.server().execute(() -> {
 				ServerPlayer player = context.player();
-				WheelUseHandler.openWheelMenu(player);
+				com.wheelofadaptation.adaptation.WheelUseHandler.openWheelMenu(player);
 			});
 		});
+	}
+
+	/** Kirim camera shake ke satu player. */
+	public static void shake(ServerPlayer player, float intensity) {
+		ServerPlayNetworking.send(player, new ShakePayload(intensity));
+	}
+
+	/** Kirim on/off camera shake ke satu player. */
+	public static void shakeConfig(ServerPlayer player, boolean enabled) {
+		ServerPlayNetworking.send(player, new ShakeConfigPayload(enabled));
 	}
 }

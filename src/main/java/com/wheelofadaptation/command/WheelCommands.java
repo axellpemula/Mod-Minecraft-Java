@@ -76,22 +76,33 @@ public class WheelCommands {
 										ctx.getSource().sendSuccess(() -> Component.literal("Effects: " + level.toUpperCase()), false);
 										return 1;
 									})))
-					.then(Commands.literal("armor")
-							.then(Commands.argument("state", StringArgumentType.word())
-									.executes(ctx -> {
-										CommandSourceStack src = ctx.getSource();
-										String state = StringArgumentType.getString(ctx, "state");
-										src.sendSuccess(() -> Component.literal("Mahoraga armor: " + state.toUpperCase() + " (Fase 2: info saja)"), false);
-										return 1;
-									})))
-					.then(Commands.literal("shake")
-							.then(Commands.argument("state", StringArgumentType.word())
-									.executes(ctx -> {
-										CommandSourceStack src = ctx.getSource();
-										String state = StringArgumentType.getString(ctx, "state");
-										src.sendSuccess(() -> Component.literal("Camera shake: " + state.toUpperCase() + " (Fase 2: info saja)"), false);
-										return 1;
-									})))
+				.then(Commands.literal("armor")
+						.executes(ctx -> {
+							ServerPlayer player = ctx.getSource().getPlayerOrException();
+							int pieces = 0;
+							for (net.minecraft.world.item.ItemStack armorStack : player.getArmorSlots()) {
+								if (armorStack.getItem() == com.wheelofadaptation.item.ModItems.MAHORAGA_CHEST
+										|| armorStack.getItem() == com.wheelofadaptation.item.ModItems.MAHORAGA_LEGS
+										|| armorStack.getItem() == com.wheelofadaptation.item.ModItems.MAHORAGA_BOOTS) {
+									pieces++;
+								}
+							}
+							int finalPieces = pieces;
+							ctx.getSource().sendSuccess(() -> Component.literal(
+									"Mahoraga armor terpasang: " + finalPieces + "/3 (texture & defense custom Bedrock)"), false);
+							return 1;
+						}))
+				.then(Commands.literal("shake")
+						.then(Commands.argument("state", StringArgumentType.word())
+								.executes(ctx -> {
+									CommandSourceStack src = ctx.getSource();
+									String state = StringArgumentType.getString(ctx, "state").toLowerCase();
+									ServerPlayer player = src.getPlayerOrException();
+									boolean enabled = state.equals("on") || state.equals("true") || state.equals("1");
+									com.wheelofadaptation.network.WheelNetworking.shakeConfig(player, enabled);
+									src.sendSuccess(() -> Component.literal("Camera shake: " + (enabled ? "ON" : "OFF")), false);
+									return 1;
+								})))
 			);
 		});
 	}

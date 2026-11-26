@@ -107,10 +107,14 @@ Recipe Bedrock:
 - [ ] Animasi keyframe penuh (seal/rewind/sword slash)
 
 ### Fase 4 — Polish
-- [ ] Model `.geo.json` → model Java roda 3D penuh
-- [ ] Balance vs Bedrock v1.4.0, camera shake
-- [ ] Multiplayer test, dedicated server
-- [ ] Release jar + docs
+- [x] **Model roda 3D penuh** — elements model emas (rim square + 4 jari-jari diagonal + hub) dengan swatch warna dari texture asli Bedrock; GUI/hand/head display transform; ItemDisplay di-scale 0.35 via NBT transform
+- [x] **Camera shake** — payload S2C (`shake`/`shake_config`) + mixin `Camera#setup` client; trigger saat Adapted (0.35) / Evolved (0.6) / RBD (1.0) / Seal (0.5); `/woa shake on|off` on/off beneran; otomatis skip saat lowFx
+- [x] **Balance vs Bedrock v1.4.0** — reflect Evolved MOB_ATTACK (2.0 dmg ke attacker), quake Seal domain (4.0, Attack mode 6.0), pierce bonus per-mode (Attack 3.0 / lain 2.0), attackHits 4 sesuai Bedrock
+- [x] **Watermark HUD** — credit "Java port of the addon by xVoid_Axell" (sesuai watermark HUD Bedrock)
+- [x] **Release jar** — GitHub Actions build otomatis tiap push + artifact jar (`build/libs/`) di tab Actions
+- [x] **/woa armor** — tampilkan jumlah Mahoraga armor terpasang (bukan info kosong)
+- [ ] Multiplayer/dedicated server test manual (butuh dijalankan di luar sandbox)
+- [ ] Camera shake smooth curve (opsional polish)
 
 ---
 

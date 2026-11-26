@@ -224,7 +224,8 @@ public class WheelUseHandler {
 		}
 
 		double radius = 8.0;
-		// Bind entity di radius: slowness + damage kecil
+		// Bind entity di radius: slowness + quake damage (Bedrock: quake)
+		float quakeDamage = data.getMode() == WheelMode.ATTACK ? 6.0F : 4.0F;
 		for (Entity entity : player.level().getEntities(player,
 				player.getBoundingBox().inflate(radius))) {
 			if (!(entity instanceof LivingEntity living) || entity == player) {
@@ -235,6 +236,7 @@ public class WheelUseHandler {
 			}
 			living.addEffect(new net.minecraft.world.effect.MobEffectInstance(
 					net.minecraft.world.effect.MobEffects.MOVEMENT_SLOWDOWN, 100, 4));
+			living.hurt(player.damageSources().playerAttack(player), quakeDamage);
 		}
 
 		// FX: ring barrier
@@ -247,6 +249,10 @@ public class WheelUseHandler {
 			}
 		}
 		player.level().playSound(null, player.blockPosition(), ModSounds.SEAL_OPEN, SoundSource.PLAYERS, 1.0F, 1.0F);
+		player.level().playSound(null, player.blockPosition(), ModSounds.SEAL_CHAIN, SoundSource.PLAYERS, 0.8F, 1.0F);
+		if (!data.isLowFx()) {
+			com.wheelofadaptation.network.WheelNetworking.shake(player, 0.5F);
+		}
 		player.displayClientMessage(Component.literal("Domain open"), true);
 		WheelOfAdaptationMod.LOGGER.info("Player {} opened Seal domain", player.getName().getString());
 	}

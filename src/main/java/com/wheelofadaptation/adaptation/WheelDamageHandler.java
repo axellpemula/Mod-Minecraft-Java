@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -68,6 +69,13 @@ public class WheelDamageHandler {
 						1.0F
 				);
 
+				// --- Reflect (Bedrock: Evolved memantulkan sebagian damage) ---
+				if (data.isEvolved(type) && type == AdaptationType.MOB_ATTACK
+						&& source.getEntity() instanceof LivingEntity attacker
+						&& attacker.isAlive()) {
+					attacker.hurt(player.damageSources().playerAttack(player), 2.0F);
+				}
+
 				if (!data.isEvolved(type)) {
 					boolean justEvolved = data.recordEvolvedHit(type);
 					if (justEvolved) {
@@ -85,6 +93,9 @@ public class WheelDamageHandler {
 								1.0F,
 								1.2F
 						);
+						if (player instanceof ServerPlayer serverPlayer && !data.isLowFx()) {
+							com.wheelofadaptation.network.WheelNetworking.shake(serverPlayer, 0.6F);
+						}
 						WheelOfAdaptationMod.LOGGER.info(
 								"Player {} evolved {} adaptation", player.getName().getString(), type
 						);
@@ -111,6 +122,9 @@ public class WheelDamageHandler {
 						1.0F,
 						1.0F
 				);
+				if (player instanceof ServerPlayer serverPlayer && !data.isLowFx()) {
+					com.wheelofadaptation.network.WheelNetworking.shake(serverPlayer, 0.35F);
+				}
 				WheelOfAdaptationMod.LOGGER.info(
 						"Player {} adapted to {}", player.getName().getString(), type
 				);
@@ -168,6 +182,9 @@ public class WheelDamageHandler {
 		player.level().playSound(null, player.blockPosition(), ModSounds.WHEEL_UNDYING, SoundSource.PLAYERS, 1.0F, 1.0F);
 		player.level().playSound(null, player.blockPosition(), ModSounds.TELEPORT, SoundSource.PLAYERS, 1.0F, 1.0F);
 		spawnAdaptParticles(player, data.isLowFx());
+		if (!data.isLowFx()) {
+			com.wheelofadaptation.network.WheelNetworking.shake(player, 1.0F);
+		}
 		WheelOfAdaptationMod.LOGGER.info("Player {} returned by death", player.getName().getString());
 	}
 

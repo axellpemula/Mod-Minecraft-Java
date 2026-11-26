@@ -8,19 +8,22 @@ Mod **Wheel of Adaptation** — portingan Java Fabric dari addon Bedrock [axellp
 
 ---
 
-## 📦 Status Porting — Fase 3 (Gameplay penuh + visual)
+## 📦 Status Porting — Fase 4 (Polish + release)
 
 | Yang sudah ada | Keterangan |
 |---|---|
 | `WheelOfAdaptationMod.java` | Titik masuk mod (ModInitializer) |
 | `ModItems.java` | **Wheel** (slot khusus), **Sword**, **Seal**, **Mode Switcher**, **Barehand**, **Settings**, armor **Mahoraga** (material custom Bedrock) |
-| `WheelDamageHandler.java` | Adaptasi: Analysing (3 hit) → Adapted → Evolved (II) + **Return by Death** |
-| `WheelTickHandler.java` | **Roda 3D berputar di kepala** (`ItemDisplay`), ring scan particle, effect flip, auto-save |
-| `WheelUseHandler.java` | Mode Switcher, Sword slash/air blast/**dash**, Barehand teleport kick/**guard**, Seal domain |
-| `WheelAttackHandler.java` | Attack adaptation (pierce) + **Purify** zombie villager |
+| `WheelDamageHandler.java` | Adaptasi: Analysing → Adapted → Evolved + **Return by Death** + **reflect** Evolved |
+| `WheelTickHandler.java` | **Roda 3D emas berputar di kepala** (model elements + `ItemDisplay` NBT transform), ring scan particle, effect flip, auto-save |
+| `models/item/wheel_of_adaptation.json` | **Model 3D roda** (rim + 4 jari-jari + hub, swatch emas dari texture Bedrock) + display transform GUI/hand/head |
+| `CameraShakeMixin` + `WheelShakeState` | **Camera shake** saat Adapted/Evolved/RBD/Seal; `/woa shake on|off` |
+| `ShakePayload/ShakeConfigPayload` | Networking S2C camera shake |
+| `WheelUseHandler.java` | Mode Switcher, Sword slash/air blast/dash, Barehand teleport kick/guard, Seal domain + **quake** |
+| `WheelAttackHandler.java` | Attack adaptation (pierce per-mode) + **Purify** zombie villager |
 | `ModParticles.java` + `AdaptWheelParticle` | **Particle custom** `adapt_wheel` (texture RP Bedrock) |
 | `WheelScreenHandler/Screen` | **Slot khusus Wheel** + UI custom (mode, adapted list, progress) |
-| `WheelHud.java` | HUD emblem + progress bar scan (kiri atas) |
+| `WheelHud.java` | HUD emblem + progress bar scan + watermark credit |
 | `WheelCommands.java` | `/woa menu/list/mode/reset/performance/armor/shake` |
 | `ModSounds.java` | 28 sound custom dari RP Bedrock |
 | `AdaptationManager.java` | Persistensi JSON per-player (load join, save leave/tick) |
@@ -36,11 +39,37 @@ Mod **Wheel of Adaptation** — portingan Java Fabric dari addon Bedrock [axellp
 8. Kalau mau mati padahal sudah adapted ≥3 → **Return by Death**: teleport ke posisi 30 detik lalu, heal 50%, 1 adapted terpakai (cooldown 60s)
 9. **Sword** hit Zombie Villager → purify (cure jadi Villager)
 
-Perbedaan dari Bedrock (sengaja, karena Java bebas): Wheel pakai **slot khusus** + roda 3D `ItemDisplay` di kepala, UI **custom Java** (bukan form Bedrock), **particle custom** `adapt_wheel` dari RP Bedrock, **Return by Death** mekanik baru Java, armor Mahoraga punya **material custom** (chest 6/legs 5/boots 2 persis Bedrock). Lihat PORTING.md.
+Perbedaan dari Bedrock (sengaja, karena Java bebas): Wheel pakai **slot khusus** + roda 3D `ItemDisplay` di kepala, UI **custom Java** (bukan form Bedrock), **particle custom** `adapt_wheel` dari RP Bedrock, **Return by Death** mekanik baru Java, **camera shake** via mixin, armor Mahoraga punya **material custom** (chest 6/legs 5/boots 2 persis Bedrock). Lihat PORTING.md.
 
 Mod ID: `wheel_of_adaptation`  
 Package: `com.wheelofadaptation`  
 Minecraft: `1.21.1` | Loader: Fabric | Java: `21`
+
+---
+
+## 🚀 Cara Dapatkan Jar (2 cara)
+
+### Cara A — Build lokal (butuh JDK 21)
+```bash
+./gradlew build            # Mac/Linux
+.\gradlew.bat build        # Windows
+```
+Jar hasil: `build/libs/wheel-of-adaptation-1.0.0.jar`
+
+### Cara B — GitHub Actions (tanpa install apa-apa)
+1. Buka tab **Actions** di repo GitHub ini
+2. Pilih workflow run terbaru (commit terakhir) → panel kanan **Artifacts** → download **Artifacts**
+3. Ekstrak → ambil `wheel-of-adaptation-1.0.0.jar` (abaikan `-sources`)
+
+---
+
+## 🧪 Test Multiplayer / Dedicated Server (checklist)
+
+1. **Dedicated server**: taruh jar + Fabric Loader + Fabric API di folder `mods/` server 1.21.1 → jalankan → pastikan log ada `Wheel of Adaptation loaded!`
+2. **Sinkronisasi data**: 2 client join → satu player equip Wheel (R) → cek roda muncul di pelayan lain; keluar-masuk server → adaptasi masih ada (cek `<world>/wheel_of_adaptation/playerdata/<uuid>.json`)
+3. **Menu + slot**: buka Wheel Menu di multiplayer → taruh/cabut Wheel → nullify jalan/tidak jalan
+4. **Camera shake**: `/woa shake off` → adaptasi tidak bikin layar goyang; `on` → goyang lagi
+5. **Return by Death**: adapted ≥3 → bunuh diri → harus rewind + cooldown aktif
 
 ---
 

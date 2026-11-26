@@ -71,6 +71,10 @@ public class WheelHud {
 					break;
 				}
 			}
+
+			// Watermark credit (sesuai HUD Bedrock: "by xVoid_Axell")
+			context.drawString(client.font, "Java port of the addon by xVoid_Axell",
+					x - 2, y + 54, 0x777777, false);
 		});
 	}
 }

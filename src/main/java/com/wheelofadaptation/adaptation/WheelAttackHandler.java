@@ -60,8 +60,8 @@ public class WheelAttackHandler {
 			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 
 			if (data.isAttackAdapted(entityType)) {
-				// Pierce: bonus damage 30% (min 2)
-				float bonus = 2.0F;
+				// Pierce: bonus damage (Bedrock attackBonus 0.3 -> Attack mode lebih besar)
+				float bonus = data.getMode() == WheelMode.ATTACK ? 3.0F : 2.0F;
 				living.hurt(player.damageSources().playerAttack(player), bonus);
 				if (living.level() instanceof ServerLevel serverLevel) {
 					serverLevel.sendParticles(
