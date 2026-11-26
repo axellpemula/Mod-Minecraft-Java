@@ -129,6 +129,21 @@ public class AdaptationManager {
 			if (obj.has("slashCutsBlocks")) {
 				data.setSlashCutsBlocks(obj.get("slashCutsBlocks").getAsBoolean());
 			}
+			if (obj.has("attackAdapted") || obj.has("attackHits")) {
+				java.util.Set<String> attackAdaptedSet = new java.util.HashSet<>();
+				java.util.Map<String, Integer> attackHitsMap = new java.util.HashMap<>();
+				if (obj.has("attackAdapted")) {
+					for (JsonElement e : obj.getAsJsonArray("attackAdapted")) {
+						attackAdaptedSet.add(e.getAsString());
+					}
+				}
+				if (obj.has("attackHits")) {
+					for (Map.Entry<String, JsonElement> entry : obj.getAsJsonObject("attackHits").entrySet()) {
+						attackHitsMap.put(entry.getKey(), entry.getValue().getAsInt());
+					}
+				}
+				data.loadAttack(attackAdaptedSet, attackHitsMap);
+			}
 			if (obj.has("keepOnDeath")) {
 				data.setKeepOnDeath(obj.get("keepOnDeath").getAsBoolean());
 			}
@@ -176,6 +191,18 @@ public class AdaptationManager {
 		obj.addProperty("slashCutsBlocks", data.isSlashCutsBlocks());
 		obj.addProperty("keepOnDeath", data.isKeepOnDeath());
 		obj.addProperty("lowFx", data.isLowFx());
+
+		// Attack adaptation (auto-detect per-entity-type, termasuk mob custom mod lain)
+		JsonArray attackAdaptedArr = new JsonArray();
+		for (String id : data.getAttackAdapted()) {
+			attackAdaptedArr.add(id);
+		}
+		obj.add("attackAdapted", attackAdaptedArr);
+		JsonObject attackHitsObj = new JsonObject();
+		for (Map.Entry<String, Integer> entry : data.getAttackHitsMap().entrySet()) {
+			attackHitsObj.addProperty(entry.getKey(), entry.getValue());
+		}
+		obj.add("attackHits", attackHitsObj);
 
 		Path file = playerFile(server, playerId);
 		try {

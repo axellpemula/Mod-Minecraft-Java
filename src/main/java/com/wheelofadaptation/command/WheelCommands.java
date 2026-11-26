@@ -42,6 +42,14 @@ public class WheelCommands {
 									String label = (data.isEvolved(type) ? "II " : "") + type.getDisplayName();
 									ctx.getSource().sendSuccess(() -> Component.literal(" - " + label), false);
 								}
+								if (!data.getAttackAdapted().isEmpty()) {
+									int count = data.getAttackAdapted().size();
+									ctx.getSource().sendSuccess(() -> Component.literal("Attack adapted (" + count + "):"), false);
+									for (String id : data.getAttackAdapted()) {
+										String name = prettyEntityName(id);
+										ctx.getSource().sendSuccess(() -> Component.literal(" - " + name), false);
+									}
+								}
 								return 1;
 							}))
 					.then(Commands.literal("mode")
@@ -106,5 +114,23 @@ public class WheelCommands {
 								})))
 			);
 		});
+	}
+
+	/**
+	 * Nama entity yang cantik dari registry (auto-detect mod lain).
+	 * "alexsmobs:megalodon" -> "Megalodon" (dari lang file mod tsb).
+	 */
+	private static String prettyEntityName(String id) {
+		try {
+			net.minecraft.resources.ResourceLocation rl = net.minecraft.resources.ResourceLocation.tryParse(id);
+			if (rl == null) {
+				return id;
+			}
+			net.minecraft.world.entity.EntityType<?> type =
+					net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.get(rl);
+			return type.getName().getString();
+		} catch (Exception e) {
+			return id;
+		}
 	}
 }

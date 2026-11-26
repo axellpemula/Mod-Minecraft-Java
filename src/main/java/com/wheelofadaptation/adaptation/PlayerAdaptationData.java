@@ -186,6 +186,10 @@ public class PlayerAdaptationData {
 		return attackAdapted.contains(entityType);
 	}
 
+	public java.util.Set<String> getAttackAdapted() {
+		return attackAdapted;
+	}
+
 	public int getAttackHits(String entityType) {
 		return attackHits.getOrDefault(entityType, 0);
 	}
@@ -249,5 +253,18 @@ public class PlayerAdaptationData {
 
 	public Map<AdaptationType, Integer> getEvolvedHitsMap() {
 		return evolvedHits;
+	}
+
+	// --- Attack adaptation serialization ---
+
+	public void loadAttack(java.util.Set<String> attackAdaptedSet, java.util.Map<String, Integer> attackHitsMap) {
+		attackAdapted.clear();
+		attackAdapted.addAll(attackAdaptedSet);
+		attackHits.clear();
+		attackHits.putAll(attackHitsMap);
+	}
+
+	public Map<String, Integer> getAttackHitsMap() {
+		return attackHits;
 	}
 }

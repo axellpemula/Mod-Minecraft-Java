@@ -57,6 +57,8 @@ public class WheelAttackHandler {
 
 			String entityType = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
 					.getKey(entity.getType()).toString();
+			// Nama cantik dari lang file (jalan juga untuk mob custom mod lain — auto-detect)
+			String displayName = entity.getType().getName().getString();
 			PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 
 			if (data.isAttackAdapted(entityType)) {
@@ -74,7 +76,7 @@ public class WheelAttackHandler {
 				boolean justAdapted = data.recordAttackHit(entityType);
 				if (justAdapted) {
 					player.displayClientMessage(
-							Component.literal("Attack adapted: " + entityType + " (pierces armor)"),
+							Component.literal("Attack adapted: " + displayName + " (pierces armor)"),
 							true
 					);
 					player.level().playSound(null, player.blockPosition(), ModSounds.WHEEL_ADAPTED, SoundSource.PLAYERS, 0.8F, 1.0F);
@@ -82,7 +84,7 @@ public class WheelAttackHandler {
 							player.getName().getString(), entityType);
 				} else {
 					player.displayClientMessage(
-							Component.literal("Attack adapting: " + entityType
+							Component.literal("Attack adapting: " + displayName
 									+ " (" + data.getAttackHits(entityType) + "/" + PlayerAdaptationData.HITS_TO_ATTACK_ADAPT + ")"),
 							true
 					);
