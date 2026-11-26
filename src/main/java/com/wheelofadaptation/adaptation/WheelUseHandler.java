@@ -46,15 +46,12 @@ public class WheelUseHandler {
 
 	public static void register() {
 		UseItemCallback.EVENT.register((player, world, hand) -> {
+			ItemStack stack = player.getItemInHand(hand);
 			if (world.isClientSide) {
-				return InteractionResult.PASS;
+				return net.minecraft.util.TypedInteractionResult.pass(stack);
 			}
 			if (!(player instanceof ServerPlayer serverPlayer)) {
-				return InteractionResult.PASS;
-			}
-			ItemStack stack = player.getItemInHand(hand);
-			if (stack.isEmpty()) {
-				return InteractionResult.PASS;
+				return net.minecraft.util.TypedInteractionResult.pass(stack);
 			}
 
 			// --- Mode Switcher ---
@@ -62,19 +59,19 @@ public class WheelUseHandler {
 				PlayerAdaptationData data = AdaptationManager.getOrCreate(player.getUUID());
 				if (!data.hasWheel()) {
 					player.displayClientMessage(Component.literal("Equip the Wheel first (press R)"), true);
-					return InteractionResult.CONSUME;
+					return net.minecraft.util.TypedInteractionResult.consume(stack);
 				}
 				WheelMode next = data.getMode().next();
 				data.setMode(next);
 				player.displayClientMessage(Component.literal("Mode: " + next.getDisplayName()), true);
 				player.level().playSound(null, player.blockPosition(), ModSounds.WHEEL_SPIN, SoundSource.PLAYERS, 0.8F, 1.0F);
-				return InteractionResult.CONSUME;
+				return net.minecraft.util.TypedInteractionResult.consume(stack);
 			}
 
 			// --- Adaptation Config: buka menu ---
 			if (stack.getItem() == ModItems.ADAPTATION_CONFIG) {
 				openWheelMenu(serverPlayer);
-				return InteractionResult.CONSUME;
+				return net.minecraft.util.TypedInteractionResult.consume(stack);
 			}
 
 			// --- Sword: Slash / Air Blast / Dash ---
@@ -87,7 +84,7 @@ public class WheelUseHandler {
 				} else {
 					slash(serverPlayer, data);
 				}
-				return InteractionResult.CONSUME;
+				return net.minecraft.util.TypedInteractionResult.consume(stack);
 			}
 
 			// --- Barehand: Teleport Kick / Guard ---
@@ -97,16 +94,16 @@ public class WheelUseHandler {
 				} else {
 					teleportKick(serverPlayer);
 				}
-				return InteractionResult.CONSUME;
+				return net.minecraft.util.TypedInteractionResult.consume(stack);
 			}
 
 			// --- Seal of Judgment ---
 			if (stack.getItem() == ModItems.SEAL_OF_JUDGMENT) {
 				seal(serverPlayer);
-				return InteractionResult.CONSUME;
+				return net.minecraft.util.TypedInteractionResult.consume(stack);
 			}
 
-			return InteractionResult.PASS;
+			return net.minecraft.util.TypedInteractionResult.pass(stack);
 		});
 	}
 
@@ -205,7 +202,7 @@ public class WheelUseHandler {
 		if (player.level() instanceof ServerLevel serverLevel) {
 			for (int i = 0; i < 30; i++) {
 				Vec3 p = eye.add(look.scale(1 + i * 0.3));
-				serverLevel.sendParticles(ParticleTypes.WIND_BURST, p.x, p.y, p.z, 1, 0.2, 0.2, 0.2, 0.1);
+				serverLevel.sendParticles(ParticleTypes.GUST, p.x, p.y, p.z, 1, 0.2, 0.2, 0.2, 0.1);
 			}
 		}
 		player.level().playSound(null, player.blockPosition(), ModSounds.AIR_BLAST_FIRE, SoundSource.PLAYERS, 1.0F, 1.0F);
@@ -265,7 +262,7 @@ public class WheelUseHandler {
 		if (player.level() instanceof ServerLevel serverLevel) {
 			for (int i = 0; i < 15; i++) {
 				Vec3 p = player.getEyePosition().subtract(look.scale(i * 0.3));
-				serverLevel.sendParticles(ParticleTypes.WIND_BURST, p.x, p.y, p.z, 1, 0.2, 0.2, 0.2, 0.1);
+				serverLevel.sendParticles(ParticleTypes.GUST, p.x, p.y, p.z, 1, 0.2, 0.2, 0.2, 0.1);
 			}
 		}
 		player.level().playSound(null, player.blockPosition(), ModSounds.DASH, SoundSource.PLAYERS, 1.0F, 1.0F);

@@ -209,8 +209,8 @@ public class WheelTickHandler {
 	}
 
 	private static void flipEffect(ServerPlayer player,
-			net.minecraft.world.effect.MobEffect negative,
-			net.minecraft.world.effect.MobEffect positive,
+			net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> negative,
+			net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> positive,
 			int duration, int amplifier) {
 		if (player.hasEffect(negative)) {
 			player.removeEffect(negative);

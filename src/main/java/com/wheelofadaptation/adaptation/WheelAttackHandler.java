@@ -26,7 +26,7 @@ import net.minecraft.world.item.ItemStack;
 public class WheelAttackHandler {
 
 	public static void register() {
-		AttackEntityCallback.EVENT.register((player, world, entity, hand, hitResult) -> {
+		AttackEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
 			if (world.isClientSide) {
 				return InteractionResult.PASS;
 			}
