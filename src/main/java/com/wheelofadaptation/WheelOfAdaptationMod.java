@@ -1,0 +1,35 @@
+package com.wheelofadaptation;
+
+import com.wheelofadaptation.block.ModBlocks;
+import com.wheelofadaptation.item.ModItems;
+import com.wheelofadaptation.itemgroup.ModItemGroups;
+import net.fabricmc.api.ModInitializer;
+import net.minecraft.resources.ResourceLocation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class WheelOfAdaptationMod implements ModInitializer {
+	public static final String MOD_ID = "wheel_of_adaptation";
+
+	// Logger ini dipakai untuk menulis teks ke console dan file log.
+	// Praktik terbaik: pakai mod id sebagai nama logger.
+	// Supaya jelas mod mana yang menulis info, warning, dan error.
+	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
+
+	@Override
+	public void onInitialize() {
+		// Kode ini jalan begitu Minecraft sudah siap load mod.
+		// Tapi beberapa hal (seperti resources) mungkin belum ter-initialize.
+		// Jadi hati-hati ya.
+
+		LOGGER.info("Wheel of Adaptation loaded! Selamat datang di dunia adaptasi!");
+
+		ModItems.register();
+		ModBlocks.register();
+		ModItemGroups.register();
+	}
+
+	public static ResourceLocation id(String path) {
+		return ResourceLocation.fromNamespaceAndPath(MOD_ID, path);
+	}
+}

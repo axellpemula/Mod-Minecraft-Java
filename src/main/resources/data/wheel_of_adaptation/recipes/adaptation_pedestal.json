@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "building",
+	"pattern": [
+		"   ",
+		" S ",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "minecraft:stone"
+		}
+	},
+	"result": {
+		"id": "wheel_of_adaptation:adaptation_pedestal",
+		"count": 1
+	}
+}
