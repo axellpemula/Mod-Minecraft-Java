@@ -63,6 +63,6 @@ public class HardcoreToolsMod implements ModInitializer {
 			ReturnByDeathFeature.clearAll();
 		});
 
-		LOGGER.info("Void Sovereign v1.7.1 initialized for Minecraft 1.21.1");
+		LOGGER.info("Void Sovereign v1.7.5 initialized for Minecraft 1.21.1");
 	}
 }
