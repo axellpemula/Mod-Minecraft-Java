@@ -1167,7 +1167,7 @@ public class HardcoreDashboardScreen extends Screen {
 	private int renderRepairTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		y = drawHeldItemShowcase(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 
-		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "INSTANT ANVIL WORKSHOP: " + s.damagedCount + "");
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "INSTANT ANVIL WORKSHOP (Damaged in Bag: " + s.damagedCount + ")");
 		y += 18;
 
 		int half = (w - 6) / 2;

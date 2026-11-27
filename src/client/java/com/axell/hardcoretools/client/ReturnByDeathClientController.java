@@ -18,6 +18,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.Perspective;
+import com.axell.hardcoretools.client.mixin.CameraAccessor;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.gl.SimpleFramebuffer;
@@ -540,7 +541,7 @@ public final class ReturnByDeathClientController {
 		// Slow orbit around the body so it reads as a cinematic drift instead of a freeze.
 		float yaw = deathBaseYaw + (float) (34.0D * out);
 		float pitch = MathHelper.clamp(deathBasePitch + (float) (50.0D * out), -90.0F, 90.0F);
-		camera.setRotation(yaw, pitch);
+		((CameraAccessor) camera).hardcoreTools$setRotation(yaw, pitch);
 	}
 
 	private static void restoreDeathCamera(MinecraftClient mc) {
