@@ -1,6 +1,0 @@
-{
-	"parent": "minecraft:item/generated",
-	"textures": {
-		"layer0": "wheel_of_adaptation:item/adaptation_config"
-	}
-}
