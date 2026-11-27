@@ -1,6 +1,6 @@
 # Void Sovereign — Fabric 1.21.1 Edition
 
-Mod **Void Sovereign v1.7.1** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema)**, **Quick Radial Wheel (`R`)**, **Arcane Altar Item Upgrader + Pity**, dan **Return by Death (`17.5s` True Chrono World Rewind)**.
+Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema)**, **Quick Radial Wheel (`R`)**, **Arcane Altar Item Upgrader + Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
 
 ## Persyaratan
 - **Minecraft Java Edition**: `1.21.1`
@@ -21,7 +21,7 @@ Jalankan perintah berikut dari dalam folder `Hardcore Tools Fabric`:
   ```
 
 File `.jar` siap pakai akan dihasilkan di:
-`Hardcore Tools Fabric/build/libs/void-sovereign-fabric-1.7.1+1.21.1.jar`
+`Hardcore Tools Fabric/build/libs/void-sovereign-fabric-1.7.5+1.21.1.jar`
 *(Salin file `.jar` tersebut — bukan yang berakhiran `-sources.jar` — ke dalam folder `.minecraft/mods/` bersama `fabric-api`).*
 
 ## Cara Membuka Menu di Dalam Game

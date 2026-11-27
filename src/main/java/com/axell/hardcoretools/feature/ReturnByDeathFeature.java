@@ -58,14 +58,14 @@ import net.minecraft.world.World;
 public final class ReturnByDeathFeature {
 	public static final String GHOST_DROP_TAG = "hc_rbd_ghost_drop";
 
-	// 17.5-Second Extended 3-Act Choreography (350 ticks @ 20 TPS)
-	public static final int ACT1_TICKS = 90;             // 0.0s - 4.5s: Death Collapse, Scattered Gear & Chained Screen
-	public static final int CRACK_SHATTER_TICKS = 42;    // 4.5s - 6.6s: Slow Full-Screen Cracks -> Glass Shatter -> Expanding Grayscale Dome
-	public static final int REWIND_FLIGHT_TICKS = 168;   // 6.6s - 15.0s: 8.4s Ultra-Smooth World & Camera Fast-Reverse
-	public static final int ACT2_TICKS = CRACK_SHATTER_TICKS + REWIND_FLIGHT_TICKS; // 210 ticks (4.5s - 15.0s)
-	public static final int ACT3_TICKS = 50;             // 15.0s - 17.5s: Shrinking Grayscale Dome & World Color Return
-	public static final int TOTAL_SEQUENCE_TICKS = ACT1_TICKS + ACT2_TICKS + ACT3_TICKS; // 350 ticks (17.5s)
-	public static final int GRACE_TICKS = 120;           // Covers 2.5s Act 3 awakening + 3.5s post-awakening safety
+	// 20-Second Extended 3-Act Choreography (400 ticks @ 20 TPS)
+	public static final int ACT1_TICKS = 110;            // 0.0s - 5.5s: Death Collapse, Scattered Gear & Chained Screen
+	public static final int CRACK_SHATTER_TICKS = 42;    // 5.5s - 7.6s: Slow Full-Screen Cracks -> Glass Shatter -> Expanding Grayscale Dome
+	public static final int REWIND_FLIGHT_TICKS = 188;   // 7.6s - 17.0s: 9.4s Ultra-Smooth World & Camera Fast-Reverse
+	public static final int ACT2_TICKS = CRACK_SHATTER_TICKS + REWIND_FLIGHT_TICKS; // 230 ticks (5.5s - 17.0s)
+	public static final int ACT3_TICKS = 60;             // 17.0s - 20.0s: Shrinking Grayscale Dome & World Color Return
+	public static final int TOTAL_SEQUENCE_TICKS = ACT1_TICKS + ACT2_TICKS + ACT3_TICKS; // 400 ticks (20.0s)
+	public static final int GRACE_TICKS = 130;           // Covers 3.0s Act 3 awakening + 3.5s post-awakening safety
 
 	private static final long MAX_HISTORY_TICKS = 1280L; // ~64s buffer for 60s max window
 	private static final int MAX_BLOCK_JOURNAL = 24000;
@@ -577,7 +577,7 @@ public final class ReturnByDeathFeature {
 				reversePath
 		);
 		HardcoreNetworking.sendRewindEvent(player, payloadJson);
-		HardcoreToolsMod.LOGGER.info("Return by Death triggered for {} (rewinding {}s over 17.5s)", player.getName().getString(), rewoundSec);
+		HardcoreToolsMod.LOGGER.info("Return by Death triggered for {} (rewinding {}s over 20s)", player.getName().getString(), rewoundSec);
 		return true;
 	}
 
@@ -641,20 +641,25 @@ public final class ReturnByDeathFeature {
 			return;
 		}
 
-		// Phase A (90..119 ticks = 4.5s..6.0s): Zero-gravity eerie levitation as screen fractures!
+		// Phase A (110..139 ticks = 5.5s..7.0s): Zero-gravity eerie levitation as screen fractures!
 		if (elapsed >= ACT1_TICKS && elapsed < ACT1_TICKS + 30) {
+			boolean spawnMotes = (elapsed % 5L == 0L);
 			for (GhostScatteredDrop gd : session.ghostDrops) {
 				Entity ent = w.getEntity(gd.entityUuid);
 				if (ent instanceof ItemEntity item && item.isAlive()) {
 					item.setNoGravity(true);
-					item.setVelocity(item.getVelocity().x * 0.82D, 0.024D, item.getVelocity().z * 0.82D);
+					item.setVelocity(item.getVelocity().x * 0.82D, 0.026D, item.getVelocity().z * 0.82D);
 					item.velocityModified = true;
+					if (spawnMotes) {
+						w.spawnParticles(ParticleTypes.REVERSE_PORTAL, item.getX(), item.getY() + 0.18D, item.getZ(),
+								1, 0.08D, 0.08D, 0.08D, 0.01D);
+					}
 				}
 			}
 			return;
 		}
 
-		// Phase B (120..148 ticks = 6.0s..7.4s): Fast magnetic reverse-suction back into the player's body!
+		// Phase B (140..167 ticks = 7.0s..8.35s): Fast magnetic reverse-suction back into the player's body!
 		if (elapsed >= ACT1_TICKS + 30 && elapsed < ACT1_TICKS + 58) {
 			double pullProgress = (elapsed - (ACT1_TICKS + 30)) / 28.0D;
 			double pullFactor = 0.24D + pullProgress * 0.50D;
@@ -711,11 +716,11 @@ public final class ReturnByDeathFeature {
 												 double rewoundSec, List<TrajectorySample> reversePath) {
 		JsonObject root = new JsonObject();
 		root.addProperty("active", active);
-		root.addProperty("durationMs", TOTAL_SEQUENCE_TICKS * 50L);                       // 17500ms (17.5s)
-		root.addProperty("act1Ms", ACT1_TICKS * 50L);                                     // 4500ms  (4.5s)
-		root.addProperty("shatterMs", (ACT1_TICKS + 30) * 50L);                           // 6000ms  (6.0s glass burst)
-		root.addProperty("rewindStartMs", (ACT1_TICKS + CRACK_SHATTER_TICKS) * 50L);      // 6600ms  (6.6s smooth flight start)
-		root.addProperty("act2Ms", (ACT1_TICKS + ACT2_TICKS) * 50L);                      // 15000ms (15.0s Act 3 start)
+		root.addProperty("durationMs", TOTAL_SEQUENCE_TICKS * 50L);                       // 20000ms (20.0s)
+		root.addProperty("act1Ms", ACT1_TICKS * 50L);                                     // 5500ms  (5.5s)
+		root.addProperty("shatterMs", (ACT1_TICKS + 30) * 50L);                           // 7000ms  (7.0s glass burst)
+		root.addProperty("rewindStartMs", (ACT1_TICKS + CRACK_SHATTER_TICKS) * 50L);      // 7600ms  (7.6s smooth flight start)
+		root.addProperty("act2Ms", (ACT1_TICKS + ACT2_TICKS) * 50L);                      // 17000ms (17.0s Act 3 start)
 		root.addProperty("deathMessage", deathMessage);
 		root.addProperty("score", score);
 		root.addProperty("worldHardcore", hardcore);
@@ -727,7 +732,7 @@ public final class ReturnByDeathFeature {
 			long endTick = reversePath.get(reversePath.size() - 1).tick;
 			long span = Math.max(1L, startTick - endTick);
 
-			// Keep up to ~150 keyframes for ultra-silky 8.4s reverse flight (< 8 KB packet)
+			// Keep up to ~150 keyframes for ultra-silky 9.4s reverse flight (< 8 KB packet)
 			int total = reversePath.size();
 			int step = Math.max(1, total / 145);
 			for (int i = 0; i < total; i += step) {
@@ -759,7 +764,7 @@ public final class ReturnByDeathFeature {
 	private static void onServerTick(MinecraftServer server) {
 		long tick = server.getTicks();
 
-		// 1. Advance active 17.5-second Return by Death rewinds
+		// 1. Advance active 20-second Return by Death rewinds
 		if (!ACTIVE_REWINDS.isEmpty()) {
 			tickActiveRewinds(server, tick);
 		}
@@ -823,7 +828,7 @@ public final class ReturnByDeathFeature {
 			player.fallDistance = 0.0F;
 
 			if (elapsed <= ACT1_TICKS) {
-				// ==================== BABAK 1 (0.0s - 4.5s): COLLAPSED CORPSE & SCATTERED GEAR ====================
+				// ==================== BABAK 1 (0.0s - 5.5s): COLLAPSED CORPSE & SCATTERED GEAR ====================
 				player.setHealth(1.0F);
 				player.setPose(EntityPose.SWIMMING);
 				player.setVelocity(0.0D, 0.0D, 0.0D);
@@ -839,16 +844,26 @@ public final class ReturnByDeathFeature {
 				// just standing there shivering.
 				player.setPose(EntityPose.SWIMMING);
 				player.setPitch(Math.max(-18.0F, Math.min(18.0F, session.deathPitch)));
-				player.hurtTime = 10;
+				// Only flash hurt-red on initial fatal impact (< 0.7s), then lie still & cold like a real corpse.
+				player.hurtTime = elapsed < 14L ? 10 : 0;
+				if (elapsed >= 16L && elapsed % 8L == 0L && session.deathDimension.equals(player.getServerWorld().getRegistryKey())) {
+					ServerWorld dw = player.getServerWorld();
+					dw.spawnParticles(ParticleTypes.REVERSE_PORTAL, session.deathX, session.deathY + 0.25D, session.deathZ,
+							3, 0.32D, 0.12D, 0.32D, 0.015D);
+					if (elapsed % 16L == 0L) {
+						dw.spawnParticles(ParticleTypes.POOF, session.deathX, session.deathY + 0.22D, session.deathZ,
+								1, 0.25D, 0.08D, 0.25D, 0.008D);
+					}
+				}
 				freezeNearbyHostiles(player, 36.0D);
 			} else if (elapsed < ACT1_TICKS + ACT2_TICKS) {
-				// ==================== BABAK 2 (4.5s - 15.0s): SHATTER -> GRAYSCALE -> 8.4s SMOOTH REWIND ====================
+				// ==================== BABAK 2 (5.5s - 17.0s): SHATTER -> GRAYSCALE -> 9.4s SMOOTH REWIND ====================
 				player.setHealth(Math.max(1.0F, player.getHealth()));
 				tickScatteredDropsReverseSuction(server, player, session, elapsed);
 
-				int rewindStartTick = ACT1_TICKS + CRACK_SHATTER_TICKS; // 132 ticks (6.6s)
+				int rewindStartTick = ACT1_TICKS + CRACK_SHATTER_TICKS; // 152 ticks (7.6s)
 				if (elapsed < rewindStartTick) {
-					// 4.5s - 6.6s: Screen cracking -> shattering -> expanding grayscale dome while items levitate/pull!
+					// 5.5s - 7.6s: Screen cracking -> shattering -> expanding grayscale dome while items levitate/pull!
 					if (elapsed >= ACT1_TICKS + 30) {
 						player.setPose(EntityPose.STANDING);
 						player.setNoGravity(false);
@@ -893,7 +908,7 @@ public final class ReturnByDeathFeature {
 				}
 				freezeNearbyHostiles(player, 38.0D);
 			} else {
-				// ==================== BABAK 3 (15.0s - 17.5s): SHRINKING GRAYSCALE & AWAKENING ====================
+				// ==================== BABAK 3 (17.0s - 20.0s): SHRINKING GRAYSCALE & AWAKENING ====================
 				if (!session.restoredFinalState) {
 					session.restoredFinalState = true;
 					discardGhostDrops(server, session);
@@ -1139,12 +1154,24 @@ public final class ReturnByDeathFeature {
 					safeX,
 					safeY + 1.0D,
 					safeZ,
-					42,
-					0.45D,
-					0.75D,
-					0.45D,
+					48,
+					0.48D,
+					0.78D,
+					0.48D,
 					0.12D
 			);
+			destWorld.spawnParticles(
+					ParticleTypes.TOTEM_OF_UNDYING,
+					safeX,
+					safeY + 1.05D,
+					safeZ,
+					24,
+					0.42D,
+					0.65D,
+					0.42D,
+					0.14D
+			);
+			destWorld.playSound(null, safeX, safeY, safeZ, SoundEvents.ITEM_TOTEM_USE, SoundCategory.PLAYERS, 0.42F, 1.28F);
 		} finally {
 			restoringWorld = false;
 		}
