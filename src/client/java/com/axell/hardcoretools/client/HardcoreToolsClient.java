@@ -2,6 +2,7 @@ package com.axell.hardcoretools.client;
 
 import org.lwjgl.glfw.GLFW;
 
+import com.axell.hardcoretools.HardcoreToolsMod;
 import com.axell.hardcoretools.client.gui.HardcoreDashboardScreen;
 import com.axell.hardcoretools.client.gui.RadialWheelScreen;
 import com.axell.hardcoretools.client.mixin.ClientWorldPropertiesAccessor;
@@ -13,14 +14,17 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.CoreShaderRegistrationCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 
 public class HardcoreToolsClient implements ClientModInitializer {
 	public static KeyBinding openDashboardKey;
@@ -88,6 +92,14 @@ public class HardcoreToolsClient implements ClientModInitializer {
 			client.execute(ReturnByDeathClientController::reset);
 		});
 
+		CoreShaderRegistrationCallback.EVENT.register(context -> {
+			context.register(
+					Identifier.of(HardcoreToolsMod.MOD_ID, "chrono_grayscale"),
+					VertexFormats.POSITION_TEXTURE_COLOR,
+					ReturnByDeathClientController::setChronoGrayscaleShader
+			);
+		});
+
 		HudRenderCallback.EVENT.register(ReturnByDeathClientController::renderAct3HudOverlay);
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -108,7 +120,10 @@ public class HardcoreToolsClient implements ClientModInitializer {
 
 			while (radialWheelKey.wasPressed()) {
 				if (client.player == null) continue;
-				if (client.currentScreen == null) {
+				if (client.currentScreen instanceof RadialWheelScreen) {
+					client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 0.95F));
+					client.setScreen(null);
+				} else if (client.currentScreen == null) {
 					if (ClientPlayNetworking.canSend(HardcoreNetworking.ActionC2SPayload.ID)) {
 						ClientPlayNetworking.send(new HardcoreNetworking.ActionC2SPayload("refresh", "{}"));
 					}

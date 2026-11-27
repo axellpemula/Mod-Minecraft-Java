@@ -1,6 +1,9 @@
 package com.axell.hardcoretools.client.gui;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Random;
 
 import org.joml.Matrix4f;
 
@@ -18,16 +21,163 @@ import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 
+/**
+ * 17.5s Return by Death Cinema Screen (Acts 1 & 2: 0.0s - 15.0s):
+ * - Act 1  (0.0s - 4.5s):  Locked Chained Death Screen over collapsed camera & real scattered 3D inventory
+ * - Act 2A (4.5s - 6.0s):  Slow multi-branching spider-web glass cracks creeping across the ENTIRE screen
+ * - Act 2B (6.0s - 7.4s):  Full-screen 44-shard tempered glass explosion + expanding monochrome grayscale dome
+ * - Act 2C (6.6s - 15.0s): 8.4s ultra-smooth monochrome world & camera fast-reverse + silver astral chronometer
+ * (Closes automatically at 15.0s so Act 3 shrinks the grayscale dome smoothly over 15.0s - 17.5s!)
+ */
 public class ReturnByDeathScreen extends Screen {
+	private record CrackSegment(
+			float x1, float y1,
+			float x2, float y2,
+			float startT, float endT,
+			float widthPx,
+			boolean primary
+	) {
+	}
+
+	private record GlassShard(
+			float cxPct, float cyPct,
+			float vx, float vy,
+			float rotSpeed, float flipSpeed,
+			float radiusPx,
+			float[] localAngles,
+			float[] localRadii,
+			boolean crimsonTinted
+	) {
+	}
+
+	private final List<CrackSegment> crackSegments = new ArrayList<>();
+	private final List<GlassShard> glassShards = new ArrayList<>();
+	private int builtWidth = -1;
+	private int builtHeight = -1;
+
 	public ReturnByDeathScreen() {
 		super(Text.literal("Return by Death"));
 	}
 
 	@Override
+	protected void init() {
+		super.init();
+		rebuildFractureGeometryIfNeeded(this.width, this.height);
+	}
+
+	private void rebuildFractureGeometryIfNeeded(int sw, int sh) {
+		if (sw <= 0 || sh <= 0 || (sw == builtWidth && sh == builtHeight && !crackSegments.isEmpty())) {
+			return;
+		}
+		builtWidth = sw;
+		builtHeight = sh;
+		crackSegments.clear();
+		glassShards.clear();
+
+		Random rng = new Random(0x524244313731L);
+		float cx = sw * 0.5F;
+		float cy = sh * 0.50F;
+		float maxReach = (float) Math.hypot(cx, cy) * 1.08F;
+
+		// 1. Build 14 full-screen multi-step radial fracture veins + side forks + spider-web cross arcs
+		int veinCount = 14;
+		int stepsPerVein = 7;
+		float[][] veinNodesX = new float[veinCount][stepsPerVein + 1];
+		float[][] veinNodesY = new float[veinCount][stepsPerVein + 1];
+
+		for (int v = 0; v < veinCount; v++) {
+			double baseAngle = (v * Math.PI * 2.0D / veinCount) + (rng.nextDouble() - 0.5D) * 0.22D;
+			float curX = cx;
+			float curY = cy;
+			veinNodesX[v][0] = curX;
+			veinNodesY[v][0] = curY;
+			double curAngle = baseAngle;
+
+			for (int s = 1; s <= stepsPerVein; s++) {
+				float stepFrac0 = (s - 1) / (float) stepsPerVein;
+				float stepFrac1 = s / (float) stepsPerVein;
+				curAngle += (rng.nextDouble() - 0.5D) * 0.34D;
+				float dist = maxReach * stepFrac1 * (0.90F + rng.nextFloat() * 0.18F);
+				float nx = cx + (float) Math.cos(curAngle) * dist;
+				float ny = cy + (float) Math.sin(curAngle) * dist;
+
+				float startT = stepFrac0 * 0.78F + rng.nextFloat() * 0.05F;
+				float endT = Math.min(0.98F, startT + 0.16F);
+				float thickness = Math.max(1.1F, 2.5F - stepFrac0 * 1.2F);
+				crackSegments.add(new CrackSegment(curX, curY, nx, ny, startT, endT, thickness, true));
+
+				// Secondary diagonal glass fork
+				if (s >= 2 && s <= 6 && rng.nextFloat() < 0.72F) {
+					double forkAng = curAngle + (rng.nextBoolean() ? 1.0D : -1.0D) * (0.42D + rng.nextDouble() * 0.38D);
+					float forkLen = maxReach * (0.11F + rng.nextFloat() * 0.10F);
+					float fx = nx + (float) Math.cos(forkAng) * forkLen;
+					float fy = ny + (float) Math.sin(forkAng) * forkLen;
+					float fStart = Math.min(0.92F, endT - 0.03F);
+					crackSegments.add(new CrackSegment(nx, ny, fx, fy, fStart, Math.min(1.0F, fStart + 0.14F), 1.15F, false));
+				}
+
+				veinNodesX[v][s] = nx;
+				veinNodesY[v][s] = ny;
+				curX = nx;
+				curY = ny;
+			}
+		}
+
+		// Concentric spider-web stress rings connecting adjacent veins
+		int[] webRings = {1, 2, 3, 5};
+		for (int ringStep : webRings) {
+			float ringBaseT = 0.20F + (ringStep / (float) stepsPerVein) * 0.68F;
+			for (int v = 0; v < veinCount; v++) {
+				if (rng.nextFloat() > 0.82F) continue;
+				int nextV = (v + 1) % veinCount;
+				float x1 = veinNodesX[v][ringStep];
+				float y1 = veinNodesY[v][ringStep];
+				float x2 = veinNodesX[nextV][ringStep];
+				float y2 = veinNodesY[nextV][ringStep];
+				float st = Math.min(0.93F, ringBaseT + rng.nextFloat() * 0.06F);
+				crackSegments.add(new CrackSegment(x1, y1, x2, y2, st, Math.min(1.0F, st + 0.10F), 1.05F, false));
+			}
+		}
+
+		// 2. Build 44 Full-Screen Tempered Glass Shards distributed across concentric rings to the corners!
+		int[] ringCounts = {8, 14, 22};
+		float[] ringRadiusPct = {0.14F, 0.33F, 0.56F};
+		for (int rIdx = 0; rIdx < ringCounts.length; rIdx++) {
+			int count = ringCounts[rIdx];
+			float rPct = ringRadiusPct[rIdx];
+			for (int i = 0; i < count; i++) {
+				double ang = (i * Math.PI * 2.0D / count) + (rng.nextDouble() - 0.5D) * (0.45D / (rIdx + 1));
+				float distX = (float) Math.cos(ang) * rPct * (0.88F + rng.nextFloat() * 0.24F);
+				float distY = (float) Math.sin(ang) * rPct * (0.88F + rng.nextFloat() * 0.24F);
+				float cxPct = 0.5F + distX;
+				float cyPct = 0.5F + distY;
+
+				float speed = (155.0F + rIdx * 95.0F) + rng.nextFloat() * 145.0F;
+				float vx = (float) Math.cos(ang) * speed + (rng.nextFloat() - 0.5F) * 45.0F;
+				float vy = (float) Math.sin(ang) * speed - (35.0F + rng.nextFloat() * 65.0F);
+				float rotSpd = (rng.nextFloat() - 0.5F) * 8.5F;
+				float flipSpd = (2.5F + rng.nextFloat() * 5.5F) * (rng.nextBoolean() ? 1.0F : -1.0F);
+				float baseRad = (16.0F + rIdx * 10.0F) + rng.nextFloat() * 16.0F;
+
+				int verts = rng.nextBoolean() ? 4 : 3;
+				float[] lAng = new float[verts];
+				float[] lRad = new float[verts];
+				for (int k = 0; k < verts; k++) {
+					lAng[k] = (float) ((k * Math.PI * 2.0D / verts) + (rng.nextDouble() - 0.5D) * 0.55D);
+					lRad[k] = baseRad * (0.68F + rng.nextFloat() * 0.50F);
+				}
+
+				glassShards.add(new GlassShard(
+						cxPct, cyPct, vx, vy, rotSpd, flipSpd, baseRad,
+						lAng, lRad, (i + rIdx) % 3 == 0
+				));
+			}
+		}
+	}
+
+	@Override
 	public boolean shouldPause() {
-		// CRITICAL: Keep Singleplayer Integrated Server running at 20 TPS during the 5.0s rewind!
 		return false;
 	}
 
@@ -38,485 +188,436 @@ public class ReturnByDeathScreen extends Screen {
 
 	@Override
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-		// Keep live 3D world completely unblurred so the fast-reverse flight is crystal clear!
-	}
-
-	@Override
-	public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-		if (!ReturnByDeathClientController.isActive()) {
-			return;
-		}
-
-		long elapsed = ReturnByDeathClientController.getElapsedMs();
-		long act1Ms = ReturnByDeathClientController.getAct1Ms(); // 1500ms
-		long act2Ms = ReturnByDeathClientController.getAct2Ms(); // 4500ms
-
-		if (elapsed < act1Ms) {
-			renderAct1LockedDeathScreen(ctx, mouseX, mouseY, elapsed, act1Ms);
-		} else {
-			renderAct2ChronoRewindStage(ctx, elapsed, act1Ms, act2Ms);
-		}
-	}
-
-	// ==================== BABAK 1 (0.0s - 1.5s): LOCKED HARDCORE/SURVIVAL DEATH SCREEN ====================
-	private void renderAct1LockedDeathScreen(DrawContext ctx, int mx, int my, long elapsed, long act1Ms) {
-		double t = Math.max(0.0D, Math.min(1.0D, elapsed / (double) Math.max(1L, act1Ms)));
-		boolean hardcore = ReturnByDeathClientController.isWorldHardcore();
-
-		// 1. Vanilla-style Crimson Death Gradient + Heartbeat Darkness Pulse
-		double pulse = 0.0D;
-		if (elapsed < 260L) {
-			pulse = Math.sin((elapsed / 260.0D) * Math.PI);
-		} else if (elapsed >= 760L && elapsed < 1040L) {
-			pulse = Math.sin(((elapsed - 760L) / 280.0D) * Math.PI);
-		}
-		int topAlpha = Math.min(235, 165 + (int) (pulse * 40 + t * 28));
-		int botAlpha = Math.min(248, 205 + (int) (pulse * 28 + t * 25));
-		ctx.fillGradient(0, 0, this.width, this.height, (topAlpha << 24) | 0x500008, (botAlpha << 24) | 0x1A000A);
-
-		int cx = this.width / 2;
-		int btnW = 200;
-		int btnH = 20;
-		int btnX = cx - btnW / 2;
-		int btn1Y = this.height / 4 + 72;
-		int btn2Y = this.height / 4 + 96;
-
-		// Tremor builds up as Abyssal Witch-Chains grip the screen (0.45..1.0) + extra rattle if clicked
-		long sinceClick = System.currentTimeMillis() - ReturnByDeathClientController.getLockShakeClickMs();
-		double clickJolt = (sinceClick >= 0L && sinceClick < 280L) ? (1.0D - sinceClick / 280.0D) * 4.5D : 0.0D;
-		double gripTremor = (t > 0.42D ? ((t - 0.42D) / 0.58D) * 2.8D : 0.0D) + clickJolt;
-		float jx = (float) (Math.sin(elapsed * 0.095D) * gripTremor);
-		float jy = (float) (Math.cos(elapsed * 0.125D) * gripTremor);
-
-		// 2. Creeping Abyssal Shadow Tendrils from all 4 corners (OpenGL smooth vector strips)
-		beginVectorAlpha(ctx, false);
-		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
-		double tendrilReach = easeOutCubic(Math.min(1.0D, t * 1.18D));
-		drawCreepingShadowTendrils(mat, this.width, this.height, cx, btn1Y + 22, tendrilReach, elapsed);
-		endVectorBlend();
-
-		// 3. Vanilla-style 2.0x Scaled "Game Over!" / "You Died!" Header + Cause of Death + Score
-		String bigTitle = hardcore ? "Game Over!" : "You Died!";
-		ctx.getMatrices().push();
-		ctx.getMatrices().translate(cx + jx * 0.4F, 30.0F + jy * 0.4F, 0.0F);
-		ctx.getMatrices().scale(2.0F, 2.0F, 2.0F);
-		int titleW = this.textRenderer.getWidth(bigTitle);
-		ctx.drawTextWithShadow(this.textRenderer, bigTitle, -titleW / 2, 0, 0xFFFF3838);
-		ctx.getMatrices().pop();
-
-		String cause = ReturnByDeathClientController.getDeathMessage();
-		drawCentered(ctx, cause, cx, 82, 0xFFF2E6EA);
-
-		String scoreLine = "Score: " + Formatting.YELLOW + ReturnByDeathClientController.getScore();
-		drawCentered(ctx, scoreLine, cx, 98, 0xFFD8CCD2);
-
-		// 4. Locked Respawn / Spectate World & Title Screen Buttons (Held Hostage by Return by Death!)
-		String topBtnLabel = hardcore ? "⛓  Spectate World  [🔒]  ⛓" : "⛓  Respawn  [🔒]  ⛓";
-		String botBtnLabel = "⛓  Title Screen  [🔒]  ⛓";
-
-		drawLockedDeathButton(ctx, (int) (btnX + jx), (int) (btn1Y + jy), btnW, btnH, topBtnLabel,
-				inRect(mx, my, btnX, btn1Y, btnW, btnH), t);
-		drawLockedDeathButton(ctx, (int) (btnX - jx * 0.8F), (int) (btn2Y + jy), btnW, btnH, botBtnLabel,
-				inRect(mx, my, btnX, btn2Y, btnW, btnH), t);
-
-		// 5. Glowing Violet-Crimson Fracture Cracks spider-webbing across the locked buttons (0.35s .. 1.50s)
-		if (t > 0.24D) {
-			double crackP = (t - 0.24D) / 0.76D;
-			beginVectorAlpha(ctx, true);
-			Matrix4f gMat = ctx.getMatrices().peek().getPositionMatrix();
-			drawButtonFractureCracks(gMat, btnX + jx, btn1Y + jy, btnW, btnH, crackP, 1L);
-			drawButtonFractureCracks(gMat, btnX - jx * 0.8F, btn2Y + jy, btnW, btnH, crackP, 2L);
-
-			// Rising Singularity Glow right before the 1.50s Shatter!
-			if (t > 0.72D) {
-				double preBurst = (t - 0.72D) / 0.28D;
-				int glowA = (int) Math.round(215 * preBurst * preBurst);
-				drawRadialGlow(gMat, cx, btn1Y + 22, (float) (28.0D + preBurst * 135.0D),
-						withAlpha(0xDF9BFF, glowA), 0x00320854);
-			}
-			endVectorBlend();
-		}
-
-		// 6. Ominous Fate Rejection Caption below locked buttons
-		int warnAlpha = Math.min(255, (int) Math.round(255 * Math.min(1.0D, t * 2.2D)));
-		String rejectText = (sinceClick >= 0L && sinceClick < 600L)
-				? "✦ FATE REJECTS YOUR DEATH — CANNOT SURRENDER ✦"
-				: "✦ Abyssal Pact Triggered — Rejecting Death... ✦";
-		int rejectCol = (sinceClick >= 0L && sinceClick < 600L) ? 0xFFFF5277 : 0xFFD884FF;
-		drawCentered(ctx, rejectText, cx, btn2Y + 30, withAlpha(rejectCol, warnAlpha));
-	}
-
-	private void drawLockedDeathButton(DrawContext ctx, int x, int y, int w, int h, String label, boolean hovered, double t) {
-		int bgTop = hovered ? 0xFF28112B : 0xFF1B0C1E;
-		int bgBot = hovered ? 0xFF140717 : 0xFF0D0510;
-		int border = t > 0.55D ? 0xFFB84DFF : (hovered ? 0xFF8E3B9E : 0xFF562863);
-
-		ctx.fillGradient(x, y, x + w, y + h, bgTop, bgBot);
-		ctx.drawBorder(x, y, w, h, border);
-		ctx.drawBorder(x + 1, y + 1, w - 2, h - 2, 0x55000000);
-
-		// Diagonal iron-shadow chain bars across left & right ends of button
-		ctx.fill(x + 3, y + 2, x + 7, y + h - 2, 0x883A1846);
-		ctx.fill(x + w - 7, y + 2, x + w - 3, y + h - 2, 0x883A1846);
-
-		int textCol = hovered ? 0xFFE5B8FF : 0xFFA889B5;
-		drawCentered(ctx, label, x + w / 2, y + 6, textCol);
-	}
-
-	// ==================== BABAK 2 (1.5s - 4.5s): FAST-REVERSE WORLD & ASTRAL CLOCKWORK ====================
-	private void renderAct2ChronoRewindStage(DrawContext ctx, long elapsed, long act1Ms, long act2Ms) {
-		long act2Elapsed = Math.max(0L, elapsed - act1Ms);
-		long act2Span = Math.max(1L, act2Ms - act1Ms); // 3000ms
-		double rawP = Math.max(0.0D, Math.min(1.0D, act2Elapsed / (double) act2Span));
-		double easedP = -(Math.cos(Math.PI * rawP) - 1.0D) / 2.0D;
-
-		float cx = this.width * 0.5F;
-		float cy = this.height * 0.5F - 6.0F;
-
-		// 1. Subtle Abyssal Cinema Letterbox Vignette (leaves center 3D world 100% crisp & visible!)
-		ctx.fillGradient(0, 0, this.width, 54, 0xCC090212, 0x00090212);
-		ctx.fillGradient(0, this.height - 64, this.width, this.height, 0x00090212, 0xDD090212);
-
-		// 2. OpenGL Additive Vector Clockwork, Shatter Shards & Temporal Warp Streaks
-		beginVectorAlpha(ctx, true);
-		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
-
-		// 2a. Shattered Death-Button Shards & Expanding Shockwave (first 0.75s of Act 2!)
-		double secInAct2 = act2Elapsed / 1000.0D;
-		if (secInAct2 < 0.75D) {
-			double sp = secInAct2 / 0.75D;
-			double ease = 1.0D - Math.pow(1.0D - sp, 3.0D);
-			int swAlpha = (int) Math.round(230 * (1.0D - sp));
-			float swR = (float) (14.0D + ease * Math.max(this.width, this.height) * 0.58D);
-			drawGlowRing(mat, cx, cy, swR, 1.4F, 7.0F, withAlpha(0xD875FF, swAlpha));
-
-			for (int i = 0; i < 16; i++) {
-				double ang = i * (Math.PI * 2.0D / 16.0D) + (i % 2 == 0 ? 0.14D : -0.09D);
-				float dist = (float) (18.0D + ease * (145.0D + (i % 3) * 38.0D));
-				float sx = cx + (float) (Math.cos(ang) * dist);
-				float sy = (this.height * 0.25F + 84.0F) + (float) (Math.sin(ang) * dist * 0.75D);
-				double spin = ang + sp * (i % 2 == 0 ? 3.4D : -3.1D);
-				int col = (i % 2 == 0) ? 0xFFFF4268 : 0xFFC86BFF;
-				drawShardPolygon(mat, sx, sy, 6.5F * (float) (1.0D - sp * 0.45D), spin,
-						withAlpha(col, swAlpha), withAlpha(0x52106B, swAlpha / 2));
-			}
-		}
-
-		// 2b. 20 Inward-Streaming Temporal Warp Streaks around screen periphery
-		float diag = (float) Math.hypot(this.width * 0.5D, this.height * 0.5D);
-		for (int i = 0; i < 20; i++) {
-			double baseAng = i * (Math.PI * 2.0D / 20.0D) - rawP * 0.85D;
-			double wave = ((rawP * 5.5D) + (i * 0.17D)) % 1.0D;
-			// Flows INWARD from outer screen edge toward clock outer perimeter (reverse time flow!)
-			float rOuter = (float) (diag * (1.05D - wave * 0.52D));
-			float rInner = Math.max(78.0F, rOuter - 34.0F);
-			if (rOuter > rInner + 4.0F) {
-				int streakAlpha = (int) Math.round(130 * Math.sin(wave * Math.PI));
-				int streakRgb = (i % 2 == 0) ? 0xB86BFF : 0x38D4FF;
-				float x1 = cx + (float) (Math.cos(baseAng) * rOuter);
-				float y1 = cy + (float) (Math.sin(baseAng) * rOuter);
-				float x2 = cx + (float) (Math.cos(baseAng) * rInner);
-				float y2 = cy + (float) (Math.sin(baseAng) * rInner);
-				drawGlowSegment(mat, x1, y1, x2, y2, 0.75F, withAlpha(streakRgb, streakAlpha));
-			}
-		}
-
-		// 2c. Giant Translucent Astral Clockwork (Counter-Rotating Hands!)
-		float clockR = Math.max(46.0F, Math.min(68.0F, this.height * 0.27F));
-		float innerGearR = clockR * 0.68F;
-
-		drawRadialGlow(mat, cx, cy, clockR + 22.0F, 0x308B3DFF, 0x0018042E);
-		drawGlowRing(mat, cx, cy, clockR, 0.90F, 4.2F, 0xBBC86BFF);
-		drawGlowRing(mat, cx, cy, clockR + 4.5F, 0.45F, 2.0F, 0x7738D4FF);
-		drawGlowRing(mat, cx, cy, innerGearR, 0.55F, 2.4F, 0x88FFB84D);
-
-		// 60 Dial Tick Marks + 12 Glowing Cardinal Hour Runes
-		for (int m = 0; m < 60; m++) {
-			double ang = -Math.PI * 0.5D + m * (Math.PI * 2.0D / 60.0D);
-			boolean majorHour = (m % 5 == 0);
-			float r1 = clockR - (majorHour ? 7.5F : 3.6F);
-			float r2 = clockR - 1.2F;
-			float x1 = cx + (float) (Math.cos(ang) * r1);
-			float y1 = cy + (float) (Math.sin(ang) * r1);
-			float x2 = cx + (float) (Math.cos(ang) * r2);
-			float y2 = cy + (float) (Math.sin(ang) * r2);
-			drawGlowSegment(mat, x1, y1, x2, y2, majorHour ? 0.95F : 0.45F,
-					majorHour ? 0xDDFFE082 : 0x66C86BFF);
-			if (majorHour) {
-				float nx = cx + (float) (Math.cos(ang) * (clockR + 4.5F));
-				float ny = cy + (float) (Math.sin(ang) * (clockR + 4.5F));
-				drawRadialGlow(mat, nx, ny, 3.0F, 0xCCFFE082, 0x00FFD859);
-			}
-		}
-
-		// Counter-Rotating Alchemical Inner Spokes
-		double gearRot = rawP * Math.PI * 3.0D;
-		for (int k = 0; k < 6; k++) {
-			double gAng = gearRot + k * (Math.PI / 3.0D);
-			float gx1 = cx + (float) (Math.cos(gAng) * 8.0F);
-			float gy1 = cy + (float) (Math.sin(gAng) * 8.0F);
-			float gx2 = cx + (float) (Math.cos(gAng) * innerGearR);
-			float gy2 = cy + (float) (Math.sin(gAng) * innerGearR);
-			drawGlowSegment(mat, gx1, gy1, gx2, gy2, 0.55F, 0x5538D4FF);
-		}
-
-		// Fast Counter-Clockwise Minute Hand (6 full backward revolutions!) & Hour Hand
-		double minuteAng = -Math.PI * 0.5D - (easedP * Math.PI * 2.0D * 6.0D);
-		double hourAng = -Math.PI * 0.5D - (easedP * Math.PI * 2.0D * 0.75D);
-
-		// Luminous trailing sweep behind Minute Hand
-		for (int trail = 1; trail <= 10; trail++) {
-			double lagAng = minuteAng + trail * 0.085D;
-			int trailAlpha = (int) Math.round(115 * (1.0D - trail / 11.0D));
-			float tx = cx + (float) (Math.cos(lagAng) * (clockR - 8.5F));
-			float ty = cy + (float) (Math.sin(lagAng) * (clockR - 8.5F));
-			drawGlowSegment(mat, cx, cy, tx, ty, 0.9F, withAlpha(0x38D4FF, trailAlpha));
-		}
-
-		float minTipX = cx + (float) (Math.cos(minuteAng) * (clockR - 6.5F));
-		float minTipY = cy + (float) (Math.sin(minuteAng) * (clockR - 6.5F));
-		drawGlowSegment(mat, cx, cy, minTipX, minTipY, 1.35F, 0xFF80F0FF);
-
-		float hrTipX = cx + (float) (Math.cos(hourAng) * (clockR * 0.54F));
-		float hrTipY = cy + (float) (Math.sin(hourAng) * (clockR * 0.54F));
-		drawGlowSegment(mat, cx, cy, hrTipX, hrTipY, 1.65F, 0xFFFFD86B);
-
-		// Central Chrono Singularity Hub
-		drawRadialGlow(mat, cx, cy, 11.0F, 0xEEFFF5D6, 0x00C86BFF);
-
-		// 2d. Final 0.24s Pre-Snap Convergence Bloom (4.26s .. 4.50s -> seamless handoff into Babak 3!)
-		if (rawP > 0.92D) {
-			double snapRamp = (rawP - 0.92D) / 0.08D;
-			int bloomA = (int) Math.round(230 * snapRamp * snapRamp);
-			drawRadialGlow(mat, cx, cy, (float) (Math.max(this.width, this.height) * 0.78D * snapRamp),
-					withAlpha(0xF5E6FF, bloomA), withAlpha(0x9B4DFF, bloomA / 3));
-		}
-
-		endVectorBlend();
-
-		// 3. Crisp Rewind Time Counter & Subtitle below the Astral Clock
-		double totalSec = ReturnByDeathClientController.getRewoundSeconds();
-		double curRewound = easedP * totalSec;
-		String timerHeadline = String.format(Locale.ROOT, "⏪  REWINDING TIME:  -%.1fs / -%.1fs", curRewound, totalSec);
-		int textY = Math.min(this.height - 38, (int) (cy + clockR + 14));
-		drawCentered(ctx, timerHeadline, (int) cx, textY, CrimsonTheme.GOLD);
-		drawCentered(ctx, "✦ Reversing World, Blocks, Entities & Fate... ✦", (int) cx, textY + 13, 0xFFD8B8FF);
+		// Transparent background so the live collapsed camera, scattered 3D items, and rewinding world remain visible!
 	}
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		long elapsed = ReturnByDeathClientController.getElapsedMs();
-		if (elapsed < ReturnByDeathClientController.getAct1Ms()) {
-			int cx = this.width / 2;
-			int btnX = cx - 100;
-			int btn1Y = this.height / 4 + 72;
-			int btn2Y = this.height / 4 + 96;
-			if (inRect(mouseX, mouseY, btnX, btn1Y, 200, 20) || inRect(mouseX, mouseY, btnX, btn2Y, 200, 20)) {
+		if (elapsed < ReturnByDeathClientController.getShatterMs()) {
+			int bw = 200;
+			int bh = 20;
+			int bx = (this.width - bw) / 2;
+			int b1y = this.height / 4 + 72;
+			int b2y = this.height / 4 + 96;
+			if (mouseX >= bx && mouseX <= bx + bw && ((mouseY >= b1y && mouseY <= b1y + bh) || (mouseY >= b2y && mouseY <= b2y + bh))) {
 				ReturnByDeathClientController.triggerLockedButtonRattle();
+				return true;
 			}
 		}
 		return true;
 	}
 
 	@Override
-	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-		// Swallow all keys during Act 1 & Act 2 so ESC/Inventory cannot interrupt the rewind!
-		return true;
+	public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
+		if (!ReturnByDeathClientController.isActive()) {
+			if (this.client != null) {
+				this.client.setScreen(null);
+			}
+			return;
+		}
+		rebuildFractureGeometryIfNeeded(this.width, this.height);
+
+		long elapsed = ReturnByDeathClientController.getElapsedMs();
+		long act1Ms = ReturnByDeathClientController.getAct1Ms();               // 4500ms
+		long shatterMs = ReturnByDeathClientController.getShatterMs();         // 6000ms
+		long rewindStartMs = ReturnByDeathClientController.getRewindStartMs(); // 6600ms
+		long act2Ms = ReturnByDeathClientController.getAct2Ms();               // 15000ms
+
+		// 1. Expanding Monochrome Grayscale World Dome (begins at 5.85s and covers 100% of screen by 7.15s!)
+		float grayFrac = ReturnByDeathClientController.getGrayscaleRadiusFraction(elapsed);
+		if (grayFrac > 0.002F) {
+			ReturnByDeathClientController.renderGrayscaleWorldCircle(ctx, this.width, this.height, grayFrac);
+		}
+
+		// 2. Act 1 & Act 2A (0.0s .. 6.0s): Locked Chained Death Screen + Slow Full-Screen Spider-Web Glass Cracks!
+		if (elapsed < shatterMs) {
+			double crackP = elapsed <= act1Ms
+					? 0.0D
+					: (elapsed - act1Ms) / (double) Math.max(1L, shatterMs - act1Ms);
+			renderLockedDeathScreenAndGlassCracks(ctx, elapsed, act1Ms, crackP);
+			return;
+		}
+
+		// 3. Act 2B & 2C (6.0s .. 15.0s): Full-Screen Glass Shatter + Monochrome Smooth World Rewind!
+		renderShatterAndMonochromeRewind(ctx, elapsed, shatterMs, rewindStartMs, act2Ms);
 	}
 
-	// ==================== OPENGL VECTOR HELPERS ====================
-	private static void beginVectorAlpha(DrawContext ctx, boolean additive) {
+	private void renderLockedDeathScreenAndGlassCracks(DrawContext ctx, long elapsed, long act1Ms, double crackP) {
+		int sw = this.width;
+		int sh = this.height;
+
+		// Subtle glass pane tension vibration as cracks approach full-screen break (crackP > 0.55)
+		int paneJitterX = 0;
+		int paneJitterY = 0;
+		if (crackP > 0.50D) {
+			double amp = (crackP - 0.50D) * 5.2D;
+			paneJitterX = (int) Math.round(Math.sin(elapsed * 0.095D) * amp);
+			paneJitterY = (int) Math.round(Math.cos(elapsed * 0.125D) * amp);
+		}
+
+		// Translucent Crimson Death Veil (keeps scattered 3D inventory on the floor clearly visible behind UI!)
+		int topAlpha = (int) Math.min(205, 118 + elapsed * 0.012D);
+		int botAlpha = (int) Math.min(225, 148 + elapsed * 0.014D);
+		ctx.fillGradient(0, 0, sw, sh, (topAlpha << 24) | 0x4E0710, (botAlpha << 24) | 0x1E0206);
+
+		// Heartbeat pulse vignette around screen edges
+		double heartPulse = Math.pow(Math.max(0.0D, Math.sin(elapsed * 0.0056D)), 4.0D);
+		int pulseAlpha = (int) Math.round(58 * heartPulse);
+		if (pulseAlpha > 2) {
+			ctx.fillGradient(0, 0, sw, 46, (pulseAlpha << 24) | 0xDC2626, 0x00DC2626);
+			ctx.fillGradient(0, sh - 46, sw, sh, 0x00DC2626, (pulseAlpha << 24) | 0xDC2626);
+		}
+
+		// Subtle frost-glass sheen growing as the screen prepares to crack
+		if (crackP > 0.0D) {
+			int sheenAlpha = (int) Math.round(28 * crackP);
+			ctx.fill(0, 0, sw, sh, (sheenAlpha << 24) | 0xDCE6F7);
+		}
+
+		// Scaled 2.0x Authentic Vanilla Death Title
+		boolean hc = ReturnByDeathClientController.isWorldHardcore();
+		String title = hc ? "Game Over!" : "You Died!";
+		ctx.getMatrices().push();
+		ctx.getMatrices().translate(paneJitterX, paneJitterY, 0.0F);
+		ctx.getMatrices().scale(2.0F, 2.0F, 2.0F);
+		int tw = this.textRenderer.getWidth(title);
+		ctx.drawTextWithShadow(this.textRenderer, title, (sw / 2 - tw) / 2, 30, 0xFFFFEFEF);
+		ctx.getMatrices().pop();
+
+		// Death Cause + Score
+		String cause = ReturnByDeathClientController.getDeathMessage();
+		int cw = this.textRenderer.getWidth(cause);
+		ctx.drawTextWithShadow(this.textRenderer, cause, (sw - cw) / 2 + paneJitterX, 85 + paneJitterY, 0xFFF2D9DE);
+
+		String scoreLine = "Score: \u00A7e" + ReturnByDeathClientController.getScore();
+		int scw = this.textRenderer.getWidth(scoreLine);
+		ctx.drawTextWithShadow(this.textRenderer, scoreLine, (sw - scw) / 2 + paneJitterX, 100 + paneJitterY, 0xFFEAEAEA);
+
+		// Locked & Chained Death Buttons
+		long sinceRattle = System.currentTimeMillis() - ReturnByDeathClientController.getLockShakeClickMs();
+		int rattleX = sinceRattle < 360L ? (int) (Math.sin(sinceRattle * 0.08D) * 4.0D) : 0;
+
+		int bw = 200;
+		int bh = 20;
+		int bx = (sw - bw) / 2 + rattleX + paneJitterX;
+		int b1y = sh / 4 + 72 + paneJitterY;
+		int b2y = sh / 4 + 96 + paneJitterY;
+
+		drawChainedLockedButton(ctx, bx, b1y, bw, bh, hc ? "Spectate World" : "Respawn", elapsed, crackP);
+		drawChainedLockedButton(ctx, bx, b2y, bw, bh, "Title Screen", elapsed, crackP);
+
+		// Ominous Abyssal Whisper Subtitle
+		String whisper;
+		int whisperColor;
+		if (elapsed < 1600L) {
+			whisper = "\u2726 FATE REJECTS THIS ENDING... \u2726";
+			whisperColor = 0xCCFCA5A5;
+		} else if (elapsed < act1Ms) {
+			whisper = "\u26D3 BOUND BY THE COVENANT OF RETURN BY DEATH \u26D3";
+			whisperColor = 0xFFE9D5FF;
+		} else {
+			whisper = "\u2736 SHATTERING THE CAUSALITY VEIL... \u2736";
+			whisperColor = 0xFFF8FAFC;
+		}
+		int ww = this.textRenderer.getWidth(whisper);
+		ctx.drawTextWithShadow(this.textRenderer, whisper, (sw - ww) / 2, b2y + 34, whisperColor);
+
+		// Act 2A (4.5s .. 6.0s): Slow Full-Screen Spider-Web Glass Fracture!
+		if (crackP > 0.001D) {
+			drawFullScreenGlassCracks(ctx, (float) crackP);
+		}
+	}
+
+	private void drawChainedLockedButton(DrawContext ctx, int x, int y, int w, int h, String label, long elapsed, double crackP) {
+		ctx.fill(x, y, x + w, y + h, 0xD81A1016);
+		int borderCol = crackP > 0.05D ? 0xFFE2E8F0 : 0xFF7F1D1D;
+		ctx.drawBorder(x, y, w, h, borderCol);
+		ctx.fill(x + 1, y + 1, x + w - 1, y + 2, 0x38FCA5A5);
+
+		// Diagonal iron-crimson chain links binding the button
+		int chainColor = 0xAA4C1D24;
+		int chainHi = 0x99F87171;
+		for (int i = 16; i < w - 16; i += 28) {
+			ctx.fill(x + i, y - 1, x + i + 8, y + 3, chainColor);
+			ctx.fill(x + i + 1, y, x + i + 7, y + 1, chainHi);
+			ctx.fill(x + i + 10, y + h - 2, x + i + 18, y + h + 2, chainColor);
+			ctx.fill(x + i + 11, y + h - 1, x + i + 17, y + h, chainHi);
+		}
+
+		String lockedLabel = "\u26D3  " + label + "  [\uD83D\uDD12]  \u26D3";
+		int lw = this.textRenderer.getWidth(lockedLabel);
+		ctx.drawTextWithShadow(this.textRenderer, lockedLabel, x + (w - lw) / 2, y + 6, 0xFF9CA3AF);
+	}
+
+	private void drawFullScreenGlassCracks(DrawContext ctx, float crackP) {
 		ctx.draw();
 		RenderSystem.enableBlend();
-		if (additive) {
-			RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
-		} else {
-			RenderSystem.defaultBlendFunc();
-		}
+		RenderSystem.defaultBlendFunc();
 		RenderSystem.disableCull();
 		RenderSystem.disableDepthTest();
 		RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-	}
 
-	private static void endVectorBlend() {
+		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+		BufferBuilder quads = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+		boolean hasAny = false;
+
+		for (CrackSegment seg : crackSegments) {
+			if (crackP <= seg.startT) continue;
+			float segP = Math.min(1.0F, (crackP - seg.startT) / Math.max(0.01F, seg.endT - seg.startT));
+			float ex = seg.x1 + (seg.x2 - seg.x1) * segP;
+			float ey = seg.y1 + (seg.y2 - seg.y1) * segP;
+
+			float dx = ex - seg.x1;
+			float dy = ey - seg.y1;
+			float len = (float) Math.hypot(dx, dy);
+			if (len < 0.5F) continue;
+			hasAny = true;
+
+			float nx = -dy / len;
+			float ny = dx / len;
+
+			// Dark tempered-glass depth shadow offset by (+1.0, +1.2)
+			float hwShadow = seg.widthPx * 0.95F;
+			emitQuadLine(quads, mat, seg.x1 + 1.0F, seg.y1 + 1.2F, ex + 1.0F, ey + 1.2F, nx * hwShadow, ny * hwShadow, 0xB8090B10);
+
+			// Crisp silver-ice / pale-amethyst outer refraction bevel
+			float hwOuter = seg.widthPx * 0.85F;
+			int outerColor = seg.primary ? 0xDDE2E8F0 : 0xB5CBD5E1;
+			emitQuadLine(quads, mat, seg.x1, seg.y1, ex, ey, nx * hwOuter, ny * hwOuter, outerColor);
+
+			// Bright white-crystalline core along primary fracture veins
+			if (seg.primary) {
+				float hwCore = Math.max(0.55F, seg.widthPx * 0.38F);
+				emitQuadLine(quads, mat, seg.x1, seg.y1, ex, ey, nx * hwCore, ny * hwCore, 0xFFFFFFFF);
+			}
+		}
+
+		if (hasAny) {
+			BuiltBuffer built = quads.endNullable();
+			if (built != null) {
+				BufferRenderer.drawWithGlobalProgram(built);
+			}
+		}
+
+		// Central impact star glow intensifying right before 6.0s shatter!
+		if (crackP > 0.15F) {
+			RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
+			float cx = this.width * 0.5F;
+			float cy = this.height * 0.5F;
+			float glowR = 26.0F + crackP * 75.0F;
+			int centerAlpha = (int) Math.min(210, Math.round(crackP * crackP * 205.0F));
+			BufferBuilder fan = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
+			fan.vertex(mat, cx, cy, 0.0F).color((centerAlpha << 24) | 0xF8FAFC);
+			for (int i = 0; i <= 36; i++) {
+				double a = (i * Math.PI * 2.0D) / 36.0D;
+				fan.vertex(mat, cx + (float) Math.cos(a) * glowR, cy + (float) Math.sin(a) * glowR, 0.0F).color(0x00DCE4F5);
+			}
+			BuiltBuffer builtGlow = fan.endNullable();
+			if (builtGlow != null) {
+				BufferRenderer.drawWithGlobalProgram(builtGlow);
+			}
+		}
+
 		RenderSystem.enableDepthTest();
 		RenderSystem.enableCull();
 		RenderSystem.defaultBlendFunc();
 		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 	}
 
-	private static void flush(BufferBuilder buf) {
-		BuiltBuffer built = buf.endNullable();
-		if (built != null) {
-			BufferRenderer.drawWithGlobalProgram(built);
+	private static void emitQuadLine(
+			BufferBuilder buf, Matrix4f mat,
+			float x1, float y1, float x2, float y2,
+			float ox, float oy, int argb
+	) {
+		buf.vertex(mat, x1 - ox, y1 - oy, 0.0F).color(argb);
+		buf.vertex(mat, x1 + ox, y1 + oy, 0.0F).color(argb);
+		buf.vertex(mat, x2 + ox, y2 + oy, 0.0F).color(argb);
+		buf.vertex(mat, x2 - ox, y2 - oy, 0.0F).color(argb);
+	}
+
+	private void renderShatterAndMonochromeRewind(DrawContext ctx, long elapsed, long shatterMs, long rewindStartMs, long act2Ms) {
+		int sw = this.width;
+		int sh = this.height;
+		int cx = sw / 2;
+		int cy = sh / 2;
+
+		double sinceShatterSec = (elapsed - shatterMs) / 1000.0D;
+		double rewindRawP = elapsed < rewindStartMs
+				? 0.0D
+				: Math.min(1.0D, (elapsed - rewindStartMs) / (double) Math.max(1L, act2Ms - rewindStartMs));
+		double rewindEasedP = ReturnByDeathClientController.easeInOutSine(rewindRawP);
+
+		// 1. Crisp Shatter Flash at t = 6.00s .. 6.32s
+		if (sinceShatterSec < 0.32D) {
+			int flashAlpha = (int) Math.round(185 * (1.0D - sinceShatterSec / 0.32D));
+			ctx.fill(0, 0, sw, sh, (flashAlpha << 24) | 0xF8FAFC);
+		}
+
+		// 2. Cinema Widescreen Letterbox Framing (keeps center 3D monochrome world 100% crisp & clear!)
+		ctx.fillGradient(0, 0, sw, 44, 0xCC090B10, 0x00090B10);
+		ctx.fillGradient(0, sh - 48, sw, sh, 0x00090B10, 0xD8090B10);
+
+		// 3. Monochrome Silver-Gold Astral Chronometer Ring spinning backward during rewind
+		drawMonochromeChronometer(ctx, cx, cy, Math.min(sw, sh) * 0.36F, elapsed, rewindEasedP);
+
+		// 4. Full-Screen 44-Shard Tempered Glass Explosion tumbling & falling away (6.00s .. 7.75s)
+		if (sinceShatterSec < 1.75D) {
+			drawTumblingGlassShards(ctx, sw, sh, (float) sinceShatterSec);
+		}
+
+		// 5. Sleek Top & Bottom Rewind HUD Readout
+		double shownRewound = ReturnByDeathClientController.getRewoundSeconds() * rewindEasedP;
+		String topTag = elapsed < rewindStartMs
+				? "\u2726 SHATTERING FATE  \u2022  RECLAIMING SCATTERED SOUL \u2726"
+				: "\u27F2 TEMPORAL REWIND IN PROGRESS";
+		int topW = this.textRenderer.getWidth(topTag);
+		ctx.drawTextWithShadow(this.textRenderer, topTag, (sw - topW) / 2, 14, 0xFFE2E8F0);
+
+		String timerText = String.format(Locale.ROOT, "-%.1fs / -%.0fs", shownRewound, ReturnByDeathClientController.getRewoundSeconds());
+		int timeW = this.textRenderer.getWidth(timerText);
+		ctx.drawTextWithShadow(this.textRenderer, timerText, (sw - timeW) / 2, sh - 34, CrimsonTheme.GOLD);
+
+		// Minimal monochrome progress hairline at bottom
+		int barW = Math.min(240, sw - 80);
+		int barX = (sw - barW) / 2;
+		int barY = sh - 18;
+		ctx.fill(barX, barY, barX + barW, barY + 3, 0x661E293B);
+		int fillW = (int) Math.round(barW * (1.0D - rewindEasedP));
+		if (fillW > 0) {
+			ctx.fill(barX, barY, barX + fillW, barY + 3, 0xFFE2E8F0);
 		}
 	}
 
-	private static void drawCreepingShadowTendrils(Matrix4f mat, int sw, int sh, float targetX, float targetY, double reach, long elapsed) {
-		float[][] origins = {
-				{0.0F, 0.0F}, {sw, 0.0F}, {0.0F, sh}, {sw, sh},
-				{0.0F, sh * 0.5F}, {sw, sh * 0.5F}, {sw * 0.3F, sh}, {sw * 0.7F, sh}
-		};
-		for (int t = 0; t < origins.length; t++) {
-			float ox = origins[t][0];
-			float oy = origins[t][1];
-			int steps = 16;
-			BufferBuilder strip = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-			for (int i = 0; i <= steps; i++) {
-				double f = (i / (double) steps) * reach;
-				float bx = (float) (ox + (targetX - ox) * f * 0.88D);
-				float by = (float) (oy + (targetY - oy) * f * 0.88D);
-				double wave = Math.sin(f * 7.5D - elapsed * 0.006D + t * 1.3D) * (1.0D - f * 0.5D) * 14.0D;
-				float dx = targetX - ox;
-				float dy = targetY - oy;
-				float len = Math.max(1.0F, (float) Math.hypot(dx, dy));
-				float nx = -dy / len;
-				float ny = dx / len;
+	private void drawMonochromeChronometer(DrawContext ctx, int cx, int cy, float radius, long elapsed, double easedP) {
+		ctx.draw();
+		RenderSystem.enableBlend();
+		RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
+		RenderSystem.disableCull();
+		RenderSystem.disableDepthTest();
+		RenderSystem.setShader(GameRenderer::getPositionColorProgram);
 
-				float px = bx + nx * (float) wave;
-				float py = by + ny * (float) wave;
-				float halfW = (float) ((1.0D - i / (double) steps) * 14.0D + 1.2D);
-				int alpha = (int) Math.round(185 * (1.0D - (i / (double) steps) * 0.55D));
-				int col = (alpha << 24) | ((t % 2 == 0) ? 0x160321 : 0x2B0738);
+		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
 
-				strip.vertex(mat, px - nx * halfW, py - ny * halfW, 0.0F).color(col);
-				strip.vertex(mat, px + nx * halfW, py + ny * halfW, 0.0F).color(col);
+		// Outer silver hairline dial
+		int segs = 72;
+		BufferBuilder ring = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
+		for (int i = 0; i <= segs; i++) {
+			double a = (i * Math.PI * 2.0D) / segs;
+			float cos = (float) Math.cos(a);
+			float sin = (float) Math.sin(a);
+			ring.vertex(mat, cx + cos * (radius - 1.4F), cy + sin * (radius - 1.4F), 0.0F).color(0x48E2E8F0);
+			ring.vertex(mat, cx + cos * (radius + 1.4F), cy + sin * (radius + 1.4F), 0.0F).color(0x00E2E8F0);
+		}
+		BuiltBuffer rb = ring.endNullable();
+		if (rb != null) {
+			BufferRenderer.drawWithGlobalProgram(rb);
+		}
+
+		// 12 Hour Dial Ticks + Reverse Clock Hands
+		BufferBuilder quads = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+		double dialSpin = -easedP * Math.PI * 2.0D;
+		for (int i = 0; i < 12; i++) {
+			double a = dialSpin + (i * Math.PI * 2.0D / 12.0D);
+			float cos = (float) Math.cos(a);
+			float sin = (float) Math.sin(a);
+			float inner = (i % 3 == 0) ? radius - 11.0F : radius - 6.0F;
+			emitQuadLine(quads, mat, cx + cos * inner, cy + sin * inner, cx + cos * radius, cy + sin * radius, -sin * 1.1F, cos * 1.1F, 0x68F8FAFC);
+		}
+
+		// Fast counter-clockwise minute hand & hour hand (faint translucent silver so center view stays unobstructed)
+		double minAngle = -Math.PI * 0.5D - easedP * Math.PI * 14.0D;
+		double hrAngle = -Math.PI * 0.5D - easedP * Math.PI * 2.5D;
+		float mCos = (float) Math.cos(minAngle), mSin = (float) Math.sin(minAngle);
+		float hCos = (float) Math.cos(hrAngle), hSin = (float) Math.sin(hrAngle);
+		emitQuadLine(quads, mat, cx + mCos * 18.0F, cy + mSin * 18.0F, cx + mCos * (radius - 14.0F), cy + mSin * (radius - 14.0F), -mSin * 1.1F, mCos * 1.1F, 0x52F8FAFC);
+		emitQuadLine(quads, mat, cx + hCos * 18.0F, cy + hSin * 18.0F, cx + hCos * (radius * 0.58F), cy + hSin * (radius * 0.58F), -hSin * 1.5F, hCos * 1.5F, 0x58FDE68A);
+
+		BuiltBuffer qb = quads.endNullable();
+		if (qb != null) {
+			BufferRenderer.drawWithGlobalProgram(qb);
+		}
+
+		RenderSystem.enableDepthTest();
+		RenderSystem.enableCull();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+	}
+
+	private void drawTumblingGlassShards(DrawContext ctx, int sw, int sh, float tSec) {
+		ctx.draw();
+		RenderSystem.enableBlend();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.disableCull();
+		RenderSystem.disableDepthTest();
+		RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+
+		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+		float fade = Math.max(0.0F, 1.0F - (tSec / 1.75F));
+		int bodyAlpha = (int) Math.round(195 * fade);
+		int glintAlpha = (int) Math.round(245 * fade);
+		if (bodyAlpha <= 3) {
+			RenderSystem.enableDepthTest();
+			RenderSystem.enableCull();
+			return;
+		}
+
+		for (GlassShard s : glassShards) {
+			float px = s.cxPct * sw + s.vx * tSec;
+			float py = s.cyPct * sh + s.vy * tSec + 250.0F * tSec * tSec;
+			float rot = s.rotSpeed * tSec;
+			// 3D tumbling perspective scale across one axis + bright specular flash when catching the light!
+			float flipCos = (float) Math.cos(s.flipSpeed * tSec);
+			float squeeze = Math.max(0.18F, Math.abs(flipCos));
+			boolean specularFlash = Math.abs(flipCos) > 0.88F;
+
+			int baseRgb = specularFlash
+					? 0xFFFFFF
+					: (s.crimsonTinted ? 0xB91C1C : 0xCBD5E1);
+			int edgeRgb = 0xF8FAFC;
+
+			int verts = s.localAngles.length;
+			float[] vxArr = new float[verts];
+			float[] vyArr = new float[verts];
+			for (int k = 0; k < verts; k++) {
+				double a = s.localAngles[k] + rot;
+				float lx = (float) Math.cos(a) * s.localRadii[k] * squeeze;
+				float ly = (float) Math.sin(a) * s.localRadii[k];
+				vxArr[k] = px + lx;
+				vyArr[k] = py + ly;
 			}
-			flush(strip);
-		}
-	}
 
-	private static void drawButtonFractureCracks(Matrix4f mat, float bx, float by, float bw, float bh, double progress, long seed) {
-		int branches = 5;
-		int alpha = (int) Math.round(235 * Math.min(1.0D, progress * 1.25D));
-		int col = withAlpha(0xDF6BFF, alpha);
-		for (int b = 0; b < branches; b++) {
-			float sx = bx + bw * (0.15F + 0.17F * b);
-			float sy = (b % 2 == 0) ? by : (by + bh);
-			float dirY = (b % 2 == 0) ? 1.0F : -1.0F;
-			float curX = sx;
-			float curY = sy;
-			int segs = 4;
-			for (int s = 1; s <= segs; s++) {
-				if ((s - 1) / (double) segs > progress) break;
-				double segFrac = Math.min(1.0D, (progress - (s - 1) / (double) segs) * segs);
-				float zig = ((s + b + (int) seed) % 2 == 0 ? 1.0F : -1.0F) * (5.5F + b * 1.2F);
-				float nx = curX + zig * (float) segFrac;
-				float ny = curY + dirY * (bh / segs) * (float) segFrac;
-				drawGlowSegment(mat, curX, curY, nx, ny, 0.75F, col);
-				curX = nx;
-				curY = ny;
+			// Glass shard polygon body
+			BufferBuilder fan = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
+			fan.vertex(mat, px, py, 0.0F).color((bodyAlpha << 24) | baseRgb);
+			for (int k = 0; k <= verts; k++) {
+				int idx = k % verts;
+				fan.vertex(mat, vxArr[idx], vyArr[idx], 0.0F).color(((bodyAlpha * 3 / 4) << 24) | edgeRgb);
+			}
+			BuiltBuffer bf = fan.endNullable();
+			if (bf != null) {
+				BufferRenderer.drawWithGlobalProgram(bf);
+			}
+
+			// Crisp crystalline bevel edge around the shard
+			BufferBuilder bevel = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
+			for (int k = 0; k < verts; k++) {
+				int nxt = (k + 1) % verts;
+				float dx = vxArr[nxt] - vxArr[k];
+				float dy = vyArr[nxt] - vyArr[k];
+				float len = (float) Math.hypot(dx, dy);
+				if (len < 0.4F) continue;
+				emitQuadLine(bevel, mat, vxArr[k], vyArr[k], vxArr[nxt], vyArr[nxt], (-dy / len) * 0.7F, (dx / len) * 0.7F, (glintAlpha << 24) | 0xFFFFFF);
+			}
+			BuiltBuffer bb = bevel.endNullable();
+			if (bb != null) {
+				BufferRenderer.drawWithGlobalProgram(bb);
 			}
 		}
-	}
 
-	private static void drawRadialGlow(Matrix4f mat, float cx, float cy, float radius, int centerCol, int edgeCol) {
-		if (radius <= 0.5F || ((centerCol >>> 24) & 0xFF) == 0) return;
-		int segs = 44;
-		BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-		buf.vertex(mat, cx, cy, 0.0F).color(centerCol);
-		for (int i = 0; i <= segs; i++) {
-			double ang = (i * Math.PI * 2.0D) / segs;
-			buf.vertex(mat, cx + (float) (Math.cos(ang) * radius), cy + (float) (Math.sin(ang) * radius), 0.0F).color(edgeCol);
-		}
-		flush(buf);
-	}
-
-	private static void drawGlowRing(Matrix4f mat, float cx, float cy, float radius, float coreHalfW, float featherW, int color) {
-		int baseAlpha = (color >>> 24) & 0xFF;
-		if (radius <= 1.0F || baseAlpha <= 0) return;
-		int segs = 64;
-		int softCol = withAlpha(color, Math.max(1, (int) (baseAlpha * 0.42F)));
-		int zeroCol = withAlpha(color, 0);
-		float rInEdge = Math.max(0.2F, radius - coreHalfW - featherW);
-		float rOutEdge = radius + coreHalfW + featherW;
-
-		BufferBuilder inSkirt = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-		for (int i = 0; i <= segs; i++) {
-			double a = (i * Math.PI * 2.0D) / segs;
-			float c = (float) Math.cos(a);
-			float s = (float) Math.sin(a);
-			inSkirt.vertex(mat, cx + c * rInEdge, cy + s * rInEdge, 0.0F).color(zeroCol);
-			inSkirt.vertex(mat, cx + c * radius, cy + s * radius, 0.0F).color(softCol);
-		}
-		flush(inSkirt);
-
-		BufferBuilder outSkirt = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-		for (int i = 0; i <= segs; i++) {
-			double a = (i * Math.PI * 2.0D) / segs;
-			float c = (float) Math.cos(a);
-			float s = (float) Math.sin(a);
-			outSkirt.vertex(mat, cx + c * radius, cy + s * radius, 0.0F).color(softCol);
-			outSkirt.vertex(mat, cx + c * rOutEdge, cy + s * rOutEdge, 0.0F).color(zeroCol);
-		}
-		flush(outSkirt);
-
-		BufferBuilder core = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
-		float rCoreIn = Math.max(0.2F, radius - coreHalfW);
-		float rCoreOut = radius + coreHalfW;
-		for (int i = 0; i <= segs; i++) {
-			double a = (i * Math.PI * 2.0D) / segs;
-			float c = (float) Math.cos(a);
-			float s = (float) Math.sin(a);
-			core.vertex(mat, cx + c * rCoreIn, cy + s * rCoreIn, 0.0F).color(color);
-			core.vertex(mat, cx + c * rCoreOut, cy + s * rCoreOut, 0.0F).color(color);
-		}
-		flush(core);
-	}
-
-	private static void drawGlowSegment(Matrix4f mat, float x1, float y1, float x2, float y2, float halfW, int color) {
-		int alpha = (color >>> 24) & 0xFF;
-		float dx = x2 - x1;
-		float dy = y2 - y1;
-		float len = (float) Math.hypot(dx, dy);
-		if (len < 0.2F || alpha <= 0) return;
-		float nx = -dy / len;
-		float ny = dx / len;
-		float gw = halfW * 2.6F;
-		int glowCol = withAlpha(color, Math.max(1, alpha / 3));
-
-		BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-		buf.vertex(mat, x1 + nx * gw, y1 + ny * gw, 0.0F).color(glowCol);
-		buf.vertex(mat, x2 + nx * gw, y2 + ny * gw, 0.0F).color(glowCol);
-		buf.vertex(mat, x2 - nx * gw, y2 - ny * gw, 0.0F).color(glowCol);
-		buf.vertex(mat, x1 - nx * gw, y1 - ny * gw, 0.0F).color(glowCol);
-
-		buf.vertex(mat, x1 + nx * halfW, y1 + ny * halfW, 0.0F).color(color);
-		buf.vertex(mat, x2 + nx * halfW, y2 + ny * halfW, 0.0F).color(color);
-		buf.vertex(mat, x2 - nx * halfW, y2 - ny * halfW, 0.0F).color(color);
-		buf.vertex(mat, x1 - nx * halfW, y1 - ny * halfW, 0.0F).color(color);
-		flush(buf);
-	}
-
-	private static void drawShardPolygon(Matrix4f mat, float cx, float cy, float size, double rot, int coreCol, int edgeCol) {
-		if (size <= 0.3F || ((coreCol >>> 24) & 0xFF) == 0) return;
-		BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-		buf.vertex(mat, cx, cy, 0.0F).color(coreCol);
-		float[] scales = {1.35F, 0.55F, 1.05F, 0.48F, 1.35F};
-		double[] offsets = {0.0D, 1.35D, Math.PI, 4.55D, Math.PI * 2.0D};
-		for (int i = 0; i < scales.length; i++) {
-			double a = rot + offsets[i];
-			float r = size * scales[i];
-			buf.vertex(mat, cx + (float) (Math.cos(a) * r), cy + (float) (Math.sin(a) * r), 0.0F).color(edgeCol);
-		}
-		flush(buf);
-	}
-
-	private void drawCentered(DrawContext ctx, String text, int cx, int y, int color) {
-		ctx.drawTextWithShadow(this.textRenderer, text, cx - this.textRenderer.getWidth(text) / 2, y, color);
-	}
-
-	private static boolean inRect(double mx, double my, int x, int y, int w, int h) {
-		return mx >= x && mx < x + w && my >= y && my < y + h;
-	}
-
-	private static double easeOutCubic(double t) {
-		double c = Math.max(0.0D, Math.min(1.0D, t));
-		return 1.0D - Math.pow(1.0D - c, 3.0D);
-	}
-
-	private static int withAlpha(int rgbOrArgb, int alpha) {
-		int clamped = Math.max(0, Math.min(255, alpha));
-		return (clamped << 24) | (rgbOrArgb & 0x00FFFFFF);
+		RenderSystem.enableDepthTest();
+		RenderSystem.enableCull();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 	}
 }

@@ -11,7 +11,6 @@ import com.google.gson.JsonObject;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
@@ -24,7 +23,6 @@ import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.client.util.InputUtil;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
@@ -92,8 +90,8 @@ public class RadialWheelScreen extends Screen {
 			);
 			case 4 -> new SliceInfo(
 					"Open Dashboard",
-					"14 TABS",
-					"Open full Hardcore Tools control center",
+					"15 TABS",
+					"Open full Void Sovereign control center",
 					icon("textures/gui/emblem.png"),
 					false,
 					CrimsonTheme.CRIMSON_BRIGHT
@@ -146,42 +144,8 @@ public class RadialWheelScreen extends Screen {
 	}
 
 	@Override
-	public void tick() {
-		if (this.actionExecuted || this.client == null) {
-			return;
-		}
-		// Release-to-Trigger when player lets go of the Radial Wheel keybind (after 110ms tap grace)
-		if (System.currentTimeMillis() - this.openMs >= 110L && !isRadialKeyStillHeld(this.client)) {
-			triggerAndClose(this.hoveredSector);
-		}
-	}
-
-	private static boolean isRadialKeyStillHeld(MinecraftClient client) {
-		if (HardcoreToolsClient.getRadialWheelKey() == null || client.getWindow() == null) {
-			return false;
-		}
-		InputUtil.Key bound = KeyBindingHelper.getBoundKeyOf(HardcoreToolsClient.getRadialWheelKey());
-		long handle = client.getWindow().getHandle();
-		if (bound.getCategory() == InputUtil.Type.KEYSYM) {
-			if (bound.getCode() == InputUtil.UNKNOWN_KEY.getCode()) return false;
-			return InputUtil.isKeyPressed(handle, bound.getCode());
-		} else if (bound.getCategory() == InputUtil.Type.MOUSE) {
-			return GLFW.glfwGetMouseButton(handle, bound.getCode()) == GLFW.GLFW_PRESS;
-		}
-		return false;
-	}
-
-	@Override
 	public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
 		this.renderBackground(ctx, mouseX, mouseY, delta);
-
-		// Check real-time key release at frame rate for ultra-snappy responsiveness!
-		if (!this.actionExecuted && this.client != null && System.currentTimeMillis() - this.openMs >= 110L) {
-			if (!isRadialKeyStillHeld(this.client)) {
-				triggerAndClose(this.hoveredSector);
-				return;
-			}
-		}
 
 		ClientStateSnapshot s = ClientStateSnapshot.INSTANCE;
 		long nowNs = System.nanoTime();
@@ -343,12 +307,19 @@ public class RadialWheelScreen extends Screen {
 
 			int hintY = Math.min(this.height - 24, Math.round(cy + (OUTER_R + 18.0F) * scale));
 			String keyName = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.radialWheelKey, "R");
-			drawCentered(ctx, "Move cursor to select  ·  Release [" + keyName + "] or Click to trigger", (int) cx, hintY, CrimsonTheme.TEXT_MUTED);
+			drawCentered(ctx, "Left-Click a slice to activate  ·  Press [" + keyName + "] or Right-Click to close", (int) cx, hintY, CrimsonTheme.TEXT_MUTED);
 		}
 	}
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (HardcoreToolsClient.getRadialWheelKey() != null
+				&& HardcoreToolsClient.getRadialWheelKey().matchesMouse(button)
+				&& System.currentTimeMillis() - this.openMs >= 120L) {
+			this.actionExecuted = true;
+			this.close();
+			return true;
+		}
 		if (button == 0) {
 			triggerAndClose(this.hoveredSector);
 			return true;
@@ -361,23 +332,23 @@ public class RadialWheelScreen extends Screen {
 	}
 
 	@Override
-	public boolean mouseReleased(double mouseX, double mouseY, int button) {
-		if (HardcoreToolsClient.getRadialWheelKey() != null
-				&& HardcoreToolsClient.getRadialWheelKey().matchesMouse(button)) {
-			triggerAndClose(this.hoveredSector);
+	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+			this.actionExecuted = true;
+			this.close();
 			return true;
 		}
-		return super.mouseReleased(mouseX, mouseY, button);
-	}
-
-	@Override
-	public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
 		if (HardcoreToolsClient.getRadialWheelKey() != null
-				&& HardcoreToolsClient.getRadialWheelKey().matchesKey(keyCode, scanCode)) {
-			triggerAndClose(this.hoveredSector);
+				&& HardcoreToolsClient.getRadialWheelKey().matchesKey(keyCode, scanCode)
+				&& System.currentTimeMillis() - this.openMs >= 120L) {
+			this.actionExecuted = true;
+			if (this.client != null) {
+				this.client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 0.95F));
+			}
+			this.close();
 			return true;
 		}
-		return super.keyReleased(keyCode, scanCode, modifiers);
+		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 
 	private void triggerAndClose(int sector) {

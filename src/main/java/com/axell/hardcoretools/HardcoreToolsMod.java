@@ -51,12 +51,18 @@ public class HardcoreToolsMod implements ModInitializer {
 			});
 		});
 
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+			ServerPlayerEntity player = handler.getPlayer();
+			ReturnByDeathFeature.onPlayerDisconnect(server, player);
+		});
+
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			ReturnByDeathFeature.abortAllActiveSessions(server);
 			HardcoreStateManager.save(server);
 			HardcoreStateManager.clearCache();
 			ReturnByDeathFeature.clearAll();
 		});
 
-		LOGGER.info("Hardcore Tools v1.7.0 initialized for Minecraft 1.21.1");
+		LOGGER.info("Void Sovereign v1.7.1 initialized for Minecraft 1.21.1");
 	}
 }

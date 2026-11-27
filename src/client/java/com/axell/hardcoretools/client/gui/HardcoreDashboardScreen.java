@@ -37,6 +37,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -44,8 +45,21 @@ import net.minecraft.util.math.RotationAxis;
 
 public class HardcoreDashboardScreen extends Screen {
 	private static final Identifier EMBLEM_TEX = Identifier.of(HardcoreToolsMod.MOD_ID, "textures/gui/emblem.png");
+	private static final String MOD_VERSION = "v1.7.1";
+	private static final String DEVELOPER_NAME = "xVoid Axell";
+	private static boolean infoLangIndonesian = true;
 
 	private record TabDef(String key, String fallback, Identifier icon) {
+	}
+
+	private record InfoEntry(
+			Identifier icon,
+			String title,
+			String category,
+			int accentColor,
+			String descId,
+			String descEn
+	) {
 	}
 
 	private static final List<TabDef> TABS = List.of(
@@ -62,7 +76,65 @@ public class HardcoreDashboardScreen extends Screen {
 			new TabDef("hc.java.tab.xp", "XP Manager", icon("xp")),
 			new TabDef("hc.java.tab.teleport", "Teleport", icon("teleport")),
 			new TabDef("hc.java.tab.waypoints", "Waypoints", icon("waypoint")),
-			new TabDef("hc.java.tab.console", "Console", icon("command"))
+			new TabDef("hc.java.tab.console", "Console", icon("command")),
+			new TabDef("hc.java.tab.info", "Info", icon("info"))
+	);
+
+	private static final List<InfoEntry> INFO_ENTRIES = List.of(
+			new InfoEntry(icon("immortal"), "Immortal", "Protection", 0xFF23D17B,
+					"Kebal terhadap seluruh jenis damage, lapar & napas air selalu penuh, serta penyelamatan otomatis saat jatuh ke Void.",
+					"Grants full immunity to all incoming damage, keeps hunger and air full, and automatically rescues you from the Void."),
+			new InfoEntry(icon("fullbright"), "Fullbright", "Protection", 0xFFFFB838,
+					"Penerangan 100% terang seperti siang hari di gua gelap, Deep Dark, dan Nether tanpa kabut atau partikel Night Vision.",
+					"Pure client-side daylight visibility inside dark caves, Deep Dark, and the Nether with zero potion fog or particles."),
+			new InfoEntry(icon("totem"), "Auto-Totem, Auto-Refill & Panic Saver", "Protection", 0xFFFFB838,
+					"Memicu Totem of Undying langsung dari slot tas mana pun saat terkena serangan mematikan, mengisi ulang offhand otomatis (Auto-Refill), dan memicu Totem lebih awal saat HP kritis (Low-HP Panic Saver).",
+					"Pops Totems of Undying directly from any inventory slot on lethal hits, auto-restocks your offhand, and pre-emptively triggers a Totem when HP drops below threshold."),
+			new InfoEntry(icon("rbd"), "Return by Death", "Protection", 0xFFC86BFF,
+					"Mencegah kematian permanen Hardcore setelah Totem habis lalu memutar balik waktu dunia hingga -60 detik (koreografi 17.5 detik: karakter rebah & item terpental, kaca layar retak & pecah, lalu dunia monokrom fast-reverse memulihkan blok, mob, langit, posisi, dan isi tas).",
+					"Intercepts fatal Hardcore deaths when no Totems remain and rewinds up to 60 seconds of world state over a 17.5s sequence—restoring broken blocks, mobs, sky time, position, and full inventory."),
+			new InfoEntry(icon("veinminer"), "Vein Miner & Tree Capitator", "World & Ore", 0xFF38C9FF,
+					"Menghancurkan satu urat bijih sekaligus dengan Pickaxe dan menebang pohon alami utuh dengan Axe tanpa merusak bangunan kayu. Dilengkapi Auto-Collect, Auto-Smelt Ores, dan Instant Leaf Decay pintar.",
+					"Breaks connected ore veins in one swing with a Pickaxe and fells natural trees with an Axe while ignoring player builds. Includes Auto-Collect, Auto-Smelt Ores, and smart single-tree Instant Leaf Decay."),
+			new InfoEntry(icon("sneakgrow"), "Sneak Grow", "World & Ore", 0xFF23D17B,
+					"Jongkok (Shift) di dekat tanaman pertanian, bibit pohon, tebu, atau jamur untuk mempercepat pertumbuhan, lengkap dengan opsi tumbuh instan penuh (Instant Full Maturity) & partikel.",
+					"Crouch/sneak near crops, saplings, sugar cane, or fungi to rapidly accelerate growth, with optional Instant Full Maturity and green sparkle particles."),
+			new InfoEntry(icon("oreplus"), "Ore Plus+", "World & Ore", 0xFFFF8C38,
+					"Menggandakan hasil tambang bijih mentah (x2 hingga x4) dan dapat diatur aktif/nonaktif untuk masing-masing jenis bijih.",
+					"Multiplies raw ore drops (x2 to x4) with individual per-ore filters so you control exactly which ores get boosted."),
+			new InfoEntry(icon("enchant"), "Enchants & God Stack (Lv. 25)", "Gear & Magic", 0xFFC86BFF,
+					"Pasang enchantment langsung ke senjata, alat, atau armor di tas hingga Over-Enchant Level XXV (25), 1-Click Auto Max All Gear, serta God Stack untuk menggabungkan enchant yang normalnya saling bentrok.",
+					"Apply enchantments directly to any gear in your bag up to Over-Enchant Level XXV (25), 1-Click Auto Max All Gear, and God Stack to combine mutually exclusive enchantments."),
+			new InfoEntry(icon("book"), "Enchanted Books", "Gear & Magic", 0xFFFFB838,
+					"Ambil buku enchantment apa pun secara instan mulai dari batas standar Vanilla hingga Over-Enchant Level XXV (25).",
+					"Instantly obtain any Enchanted Book from the full registry at either Vanilla max level or custom Over-Enchant levels up to XXV (25)."),
+			new InfoEntry(icon("repair"), "Repair Workshop", "Gear & Magic", 0xFF38C9FF,
+					"Perbaiki instan durability item di tangan utama, armor yang sedang dipakai, hotbar, atau seluruh isi inventory sekaligus tanpa Anvil.",
+					"Instantly restore full durability to your held item, equipped armor, hotbar, or entire inventory with zero Anvil penalty."),
+			new InfoEntry(icon("upgrader"), "Item Upgrader (Arcane Altar)", "Gear & Magic", 0xFFE02444,
+					"Korbankan item dari tas untuk menempa item target pilihan (otomatis mewariskan enchantment). Jika gagal, kamu tetap mendapat XP dan mengisi Arcane Pity (Soft Pity di 70%, jaminan 100% Jackpot di 100%).",
+					"Sacrifice items from your bag to forge any chosen target reward while inheriting enchantments. Failed rolls grant XP and build Arcane Pity (Soft Pity at 70%, guaranteed 100% Jackpot at 100%)."),
+			new InfoEntry(icon("uncraft"), "Uncraft & Book Extractor", "Gear & Magic", 0xFF23D17B,
+					"Bongkar kembali item hasil crafting menjadi bahan mentahnya dan ekstrak seluruh enchantment menjadi Enchanted Book terpisah (Split Enchanted Books).",
+					"Deconstruct crafted items back into their raw ingredients and extract applied enchantments into Enchanted Books (with optional Split Enchanted Books)."),
+			new InfoEntry(icon("effects"), "Potion Effects", "Gear & Magic", 0xFFC86BFF,
+					"Berikan efek potion positif instan hingga Tier X dengan durasi detik kustom atau Infinite Duration (∞), serta hapus efek buruk sekali klik.",
+					"Apply positive status buffs up to Tier X with custom seconds or Infinite Duration (∞), or cure negative effects in a single click."),
+			new InfoEntry(icon("xp"), "XP Manager", "Gear & Magic", 0xFF23D17B,
+					"Atur level XP ke angka pasti, tambah/kurangi +1 hingga +100 level secara instan, atau reset XP kembali ke 0.",
+					"Set your exact XP level, add or subtract +1 to +100 levels instantly, or reset your XP back to zero."),
+			new InfoEntry(icon("teleport"), "Teleport & Pinpoint Locator", "Navigation", 0xFF38C9FF,
+					"Lacak & teleport aman (Instant Safe Teleport) langsung ke titik inti Biome, Struktur (End Portal Room, End Ship, Ancient City, Trial Vault), Pemain, atau Koordinat X Y Z lintas dimensi + fitur ↩ Back.",
+					"Locate and safely warp directly to Biomes, Structure cores (End Portal Room, End Ship, Ancient City, Trial Vault), online players, or exact X Y Z coordinates across dimensions with ↩ Back support."),
+			new InfoEntry(icon("waypoint"), "Waypoints", "Navigation", 0xFFFFB838,
+					"Simpan lokasi penting dengan nama dan penanda warna di Overworld, Nether, maupun The End untuk teleport kembali kapan saja.",
+					"Save custom named and color-coded locations across Overworld, Nether, and The End for one-click cross-dimensional warping."),
+			new InfoEntry(icon("command"), "Console, GameMode & Gamerules", "Navigation", 0xFFE02444,
+					"Jalankan command meski di dunia Hardcore tanpa cheats, ganti GameMode (Creative, Survival, Hardcore, Spectator, Adventure), atur waktu/cuaca, dan ubah World Gamerules.",
+					"Execute commands even in locked Hardcore worlds, switch between 5 GameModes (including Hardcore), control time/weather, and toggle World Gamerules."),
+			new InfoEntry(EMBLEM_TEX, "Quick Radial Wheel", "Shortcut", 0xFFFF4264,
+					"Tekan tombol R sekali di dalam game (tanpa perlu ditahan) untuk membuka menu roda cepat 8 fitur favorit, lalu Klik Kiri untuk mengaktifkan.",
+					"Press R once in-game (single-press toggle, no hold needed) to open the 8-slice Quick Radial Wheel, then Left-Click any slice to trigger.")
 	);
 
 	private record NamedEntry(String id, String label) {
@@ -182,7 +254,7 @@ public class HardcoreDashboardScreen extends Screen {
 	private ItemStack hoveredTooltipStack = ItemStack.EMPTY;
 
 	public HardcoreDashboardScreen() {
-		super(Text.literal("Hardcore Tools"));
+		super(Text.literal("Void Sovereign"));
 	}
 
 	private static Identifier icon(String name) {
@@ -224,7 +296,7 @@ public class HardcoreDashboardScreen extends Screen {
 		this.primaryInput.setWidth(inputW);
 
 		switch (tab) {
-			case 4, 5 -> {
+			case 4, 5, 14 -> {
 				this.primaryInput.setVisible(true);
 				this.primaryInput.setPlaceholder(Text.translatable("hc.java.search").formatted(Formatting.DARK_GRAY));
 				this.primaryInput.setText(this.searchQuery);
@@ -356,8 +428,8 @@ public class HardcoreDashboardScreen extends Screen {
 		// HD 64x64 Emblem & Spacious Title
 		CrimsonTheme.drawCircle(ctx, panelX + 20, panelY + 17, 11.5F, CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_BRIGHT, 38));
 		ctx.drawTexture(EMBLEM_TEX, panelX + 10, panelY + 7, 20, 20, 0.0F, 0.0F, 64, 64, 64, 64);
-		ctx.drawTextWithShadow(this.textRenderer, "HARDCORE TOOLS", panelX + 35, panelY + 8, CrimsonTheme.TEXT_PRIMARY);
-		String subLine = "v1.7.0 · " + CrimsonTheme.getActivePalette().name();
+		ctx.drawTextWithShadow(this.textRenderer, "VOID SOVEREIGN", panelX + 35, panelY + 8, CrimsonTheme.TEXT_PRIMARY);
+		String subLine = MOD_VERSION + " · " + CrimsonTheme.getActivePalette().name();
 		ctx.drawTextWithShadow(this.textRenderer, subLine, panelX + 35, panelY + 19, CrimsonTheme.TEXT_MUTED);
 
 		// Close Button (Rightmost)
@@ -399,7 +471,7 @@ public class HardcoreDashboardScreen extends Screen {
 		}
 
 		// Live Header Status Pills (Collision-Guarded against left title)
-		int minChipLeft = panelX + 38 + Math.max(this.textRenderer.getWidth("HARDCORE TOOLS"), this.textRenderer.getWidth(subLine)) + 10;
+		int minChipLeft = panelX + 38 + Math.max(this.textRenderer.getWidth("VOID SOVEREIGN"), this.textRenderer.getWidth(subLine)) + 10;
 		int chipRight = swatchStartX - 8;
 		int chipY = panelY + 11;
 
@@ -452,8 +524,14 @@ public class HardcoreDashboardScreen extends Screen {
 		CrimsonTheme.drawRoundedRect(ctx, sideX + 1, sideY + 1, sidebarW - 1, sideH - 2, 6.0F, CrimsonTheme.BG_SIDEBAR);
 		ctx.fill(sideX + sidebarW, sideY + 2, sideX + sidebarW + 1, sideY + sideH - 2, CrimsonTheme.BORDER_SUBTLE);
 
-		// Compute sidebar layout height including 4 compact category headers
-		int totalSideH = TABS.size() * 22 + 4 * 12 + 10;
+		// Compute sidebar layout height dynamically including category headers
+		int catCount = 0;
+		for (int i = 0; i < TABS.size(); i++) {
+			if (sidebarCategoryTitle(i) != null) {
+				catCount++;
+			}
+		}
+		int totalSideH = TABS.size() * 22 + catCount * 12 + 10;
 		this.maxSidebarScroll = Math.max(0, totalSideH - sideH);
 		this.sidebarScroll = Math.max(0.0, Math.min(this.maxSidebarScroll, this.sidebarScroll));
 
@@ -619,9 +697,10 @@ public class HardcoreDashboardScreen extends Screen {
 	private static String sidebarCategoryTitle(int tabIdx) {
 		return switch (tabIdx) {
 			case 0 -> "SURVIVAL";
-			case 1 -> "WORLD & ORE";
+			case 1 -> "WORLD";
 			case 4 -> "GEAR & MAGIC";
 			case 11 -> "NAVIGATION";
+			case 14 -> "INFO";
 			default -> null;
 		};
 	}
@@ -711,10 +790,10 @@ public class HardcoreDashboardScreen extends Screen {
 		int btnY = dy + dh - quickBtnH - 5;
 		boolean qHov = inRect(mx, my, padX, btnY, innerW, quickBtnH);
 		String wheelKey = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.radialWheelKey, "R");
-		String wheelBtnTxt = trimToWidth("⚡ Wheel [" + wheelKey + "]", innerW - 8);
+		String wheelBtnTxt = trimToWidth("Wheel [" + wheelKey + "]", innerW - 8);
 		CrimsonTheme.drawSubtleButton(ctx, this.textRenderer, padX, btnY, innerW, quickBtnH, wheelBtnTxt, false, qHov);
 		if (qHov) {
-			this.hoveredCustomTip = "Open Quick Radial Wheel or hold [" + wheelKey + "]";
+			this.hoveredCustomTip = "Open Quick Radial Wheel or press [" + wheelKey + "]";
 		}
 		clickZones.add(new ClickZone(padX, btnY, innerW, quickBtnH, () -> {
 			if (this.client != null) {
@@ -739,6 +818,7 @@ public class HardcoreDashboardScreen extends Screen {
 			case 11 -> renderTeleportTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 			case 12 -> renderWaypointsTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 			case 13 -> renderConsoleTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 14 -> renderInfoTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 			default -> y;
 		};
 	}
@@ -747,11 +827,9 @@ public class HardcoreDashboardScreen extends Screen {
 	private int renderProtectionTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "SURVIVAL SHIELD & VISION");
 		y += 18;
-		y = drawToggleCard(ctx, x, y, w, "Immortal Mode", "Zero incoming damage, instant hunger/air & void rescue",
+		y = drawToggleCard(ctx, x, y, w, "Immortal",
 				s.immortal, clipTop, clipBot, mx, my, () -> sendAction("toggle_immortal", new JsonObject()));
-		String fbKey = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.toggleFullbrightKey, "G");
 		y = drawToggleCard(ctx, x, y, w, "Fullbright",
-				"100% pure daylight in caves, Deep Dark & Nether — no potion fog [" + fbKey + "]",
 				s.fullbright, clipTop, clipBot, mx, my, () -> {
 					s.fullbright = !s.fullbright;
 					JsonObject o = new JsonObject();
@@ -761,11 +839,11 @@ public class HardcoreDashboardScreen extends Screen {
 
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y + 4, w, "AUTO-TOTEM: " + s.totemCount + "");
 		y += 22;
-		y = drawToggleCard(ctx, x, y, w, "Auto-Totem", "Intercepts fatal hits & pops Totems directly from any bag slot",
+		y = drawToggleCard(ctx, x, y, w, "Auto-Totem",
 				s.autoTotem, clipTop, clipBot, mx, my, () -> sendAction("toggle_autototem", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Auto-Refill", "Automatically keeps your offhand stocked with a Totem",
+		y = drawToggleCard(ctx, x, y, w, "Auto-Refill",
 				s.autoTotemOffhand, clipTop, clipBot, mx, my, () -> sendAction("toggle_autototem_offhand", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Low-HP Panic Saver", "Pre-emptively pops a Totem when HP drops below threshold",
+		y = drawToggleCard(ctx, x, y, w, "Low-HP Panic Saver",
 				s.panicSaver, clipTop, clipBot, mx, my, () -> sendAction("toggle_panic_saver", new JsonObject()));
 
 		y = drawSliderCard(ctx, "panic_hp", x, y, w, "Panic HP Threshold", (s.panicHpThreshold / 2.0F) + " ❤",
@@ -775,12 +853,10 @@ public class HardcoreDashboardScreen extends Screen {
 
 		String rbdHdr = s.returnByDeathCooldownLeft > 0
 				? ("⏪ RETURN BY DEATH COOLDOWN: " + s.returnByDeathCooldownLeft + "S")
-				: "⏪ RETURN BY DEATH TRUE CHRONO REWIND";
+				: "⏪ RETURN BY DEATH";
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y + 4, w, rbdHdr);
 		y += 22;
-		y = drawToggleCard(ctx, x, y, w,
-				"Return by Death",
-				"Locks Death Screen & rewinds World, Blocks, Bag & Fate",
+		y = drawToggleCard(ctx, x, y, w, "Return by Death",
 				s.returnByDeath, clipTop, clipBot, mx, my, () -> sendAction("toggle_rbd", new JsonObject()));
 
 		y = drawSliderCard(ctx, "rbd_sec", x, y, w,
@@ -804,15 +880,15 @@ public class HardcoreDashboardScreen extends Screen {
 	private int renderVeinTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "VEIN MINER & TREE CAPITATOR");
 		y += 18;
-		y = drawToggleCard(ctx, x, y, w, "Vein Miner", "Breaks connected ore veins in one swing using your Pickaxe",
+		y = drawToggleCard(ctx, x, y, w, "Vein Miner",
 				s.veinMiner, clipTop, clipBot, mx, my, () -> sendAction("toggle_vein", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Tree Capitator", "Fells full natural trees with an Axe while ignoring log builds",
+		y = drawToggleCard(ctx, x, y, w, "Tree Capitator",
 				s.treeCapitator, clipTop, clipBot, mx, my, () -> sendAction("toggle_tree", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Auto-Collect", "Teleports mined vein & tree drops straight into your bag",
+		y = drawToggleCard(ctx, x, y, w, "Auto-Collect",
 				s.veinAutoCollect, clipTop, clipBot, mx, my, () -> sendAction("toggle_autocollect", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Auto-Smelt Ores", "Smelts Iron, Gold, Copper & Ancient Debris into Ingots/Scrap",
+		y = drawToggleCard(ctx, x, y, w, "Auto-Smelt Ores",
 				s.veinAutoSmelt, clipTop, clipBot, mx, my, () -> sendAction("toggle_autosmelt", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Instant Leaf Decay", "Only decays leaves owned by the felled tree — neighboring trees stay untouched",
+		y = drawToggleCard(ctx, x, y, w, "Instant Leaf Decay",
 				s.fastLeafDecay, clipTop, clipBot, mx, my, () -> sendAction("toggle_leafdecay", new JsonObject()));
 
 		y = drawSliderCard(ctx, "vein_max", x, y, w, "Max Chain Blocks per Break", s.veinMaxBlocks + " blocks",
@@ -826,11 +902,11 @@ public class HardcoreDashboardScreen extends Screen {
 	private int renderSneakTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "SNEAK GROW AURA");
 		y += 18;
-		y = drawToggleCard(ctx, x, y, w, "Enable Sneak Grow", "Crouch/sneak near crops, saplings, canes or fungi to accelerate growth",
+		y = drawToggleCard(ctx, x, y, w, "Sneak Grow",
 				s.sneakGrow, clipTop, clipBot, mx, my, () -> sendAction("toggle_sneakgrow", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Instant Full Maturity", "Instant max growth",
+		y = drawToggleCard(ctx, x, y, w, "Instant Full Maturity",
 				s.sneakGrowInstant, clipTop, clipBot, mx, my, () -> sendAction("toggle_sneak_instant", new JsonObject()));
-		y = drawToggleCard(ctx, x, y, w, "Sparkle Particles", "Show green growth sparkles when crops & saplings advance",
+		y = drawToggleCard(ctx, x, y, w, "Sparkle Particles",
 				s.sneakGrowParticles, clipTop, clipBot, mx, my, () -> sendAction("toggle_sneak_particles", new JsonObject()));
 
 		y = drawSliderCard(ctx, "sneak_rad", x, y, w, "Aura Radius", s.sneakGrowRadius + " blocks",
@@ -848,7 +924,7 @@ public class HardcoreDashboardScreen extends Screen {
 	private int renderOrePlusTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "ORE PLUS+");
 		y += 18;
-		y = drawToggleCard(ctx, x, y, w, "Ore Plus Boost", "Multiplies raw ore drops",
+		y = drawToggleCard(ctx, x, y, w, "Ore Plus Boost",
 				s.orePlusEnabled, clipTop, clipBot, mx, my, () -> sendAction("toggle_oreplus", new JsonObject()));
 
 		y = drawSliderCard(ctx, "ore_mult", x, y, w, "Ore Yield Multiplier", "x" + s.orePlusMultiplier,
@@ -979,7 +1055,7 @@ public class HardcoreDashboardScreen extends Screen {
 		});
 		y += 22;
 
-		y = drawToggleCard(ctx, x, y, w, "God Stack", "Bypass Conflicts Combine Enchantment",
+		y = drawToggleCard(ctx, x, y, w, "God Stack",
 				s.bypassEnchantConflicts, clipTop, clipBot, mx, my, () -> sendAction("toggle_bypass_conflicts", new JsonObject()));
 
 		y = drawSliderCard(ctx, "ench_lv", x, y, w, "Target Enchantment Level (1–25)",
@@ -1091,7 +1167,7 @@ public class HardcoreDashboardScreen extends Screen {
 	private int renderRepairTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		y = drawHeldItemShowcase(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 
-		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "INSTANT ANVIL WORKSHOP (Damaged in Bag: " + s.damagedCount + ")");
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "INSTANT ANVIL WORKSHOP: " + s.damagedCount + "");
 		y += 18;
 
 		int half = (w - 6) / 2;
@@ -2433,9 +2509,7 @@ public class HardcoreDashboardScreen extends Screen {
 		y += previewCardH + 5;
 
 		// 2. Split Enchanted Books Toggle
-		y = drawToggleCard(ctx, x, y, w,
-				"Split Enchants into Separate Books",
-				"1 Enchanted Book per enchant",
+		y = drawToggleCard(ctx, x, y, w, "Split Enchanted Books",
 				s.uncraftSplitBooks, clipTop, clipBot, mx, my,
 				() -> s.uncraftSplitBooks = !s.uncraftSplitBooks);
 
@@ -2532,14 +2606,14 @@ public class HardcoreDashboardScreen extends Screen {
 
 	// ==================== TAB 9: POTION EFFECTS ====================
 	private int renderEffectsTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
-		y = drawToggleCard(ctx, x, y, w, "Fullbright", "Pure client-side daylight vision without Night Vision fog or particles",
+		y = drawToggleCard(ctx, x, y, w, "Fullbright",
 				s.fullbright, clipTop, clipBot, mx, my, () -> {
 					s.fullbright = !s.fullbright;
 					JsonObject o = new JsonObject();
 					o.addProperty("value", s.fullbright);
 					sendAction("toggle_fullbright", o);
 				});
-		y = drawToggleCard(ctx, x, y, w, "Infinite Duration (∞)", "Keep applied potion buffs active permanently until cleared",
+		y = drawToggleCard(ctx, x, y, w, "Infinite Duration (∞)",
 				s.effectInfinite, clipTop, clipBot, mx, my, () -> s.effectInfinite = !s.effectInfinite);
 
 		if (!s.effectInfinite) {
@@ -2631,10 +2705,7 @@ public class HardcoreDashboardScreen extends Screen {
 
 		String q = this.searchQuery == null ? "" : this.searchQuery.trim().toLowerCase(Locale.ROOT);
 		if (s.teleportSubTab == 0 || s.teleportSubTab == 1) {
-			String subDesc = (s.teleportSubTab == 1)
-					? "Pinpoint Core TP: warps straight to End Portal, End Ship, Vault, Blaze Spawner & Loot Heart!"
-					: "Automatically teleports to a safe surface/cave floor once located";
-			y = drawToggleCard(ctx, x, y, w, "Instant Safe Teleport on Locate", subDesc,
+			y = drawToggleCard(ctx, x, y, w, "Instant Safe Teleport",
 					s.locatorAutoTp, clipTop, clipBot, mx, my, () -> s.locatorAutoTp = !s.locatorAutoTp);
 
 			List<NamedEntry> list = (s.teleportSubTab == 0) ? BIOMES : STRUCTURES;
@@ -2811,13 +2882,113 @@ public class HardcoreDashboardScreen extends Screen {
 		for (String[] rule : rules) {
 			String key = rule[0];
 			boolean val = Boolean.TRUE.equals(s.gamerules.getOrDefault(key, false));
-			y = drawToggleCard(ctx, x, y, w, rule[1], "Toggle world rule: " + key, val, clipTop, clipBot, mx, my, () -> {
+			y = drawToggleCard(ctx, x, y, w, rule[1], val, clipTop, clipBot, mx, my, () -> {
 				JsonObject o = new JsonObject();
 				o.addProperty("rule", key);
 				sendAction("console_gamerule", o);
 			});
 		}
 		return y;
+	}
+
+	// ==================== TAB 14: INFO, CREDITS & FEATURE GUIDE ====================
+	private int renderInfoTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
+		// 1. Hero Mod Version & Developer Credits Card
+		int heroH = 54;
+		CrimsonTheme.drawCard(ctx, x, y, w, heroH, false, CrimsonTheme.GOLD);
+		CrimsonTheme.drawCircle(ctx, x + 22.0F, y + 27.0F, 15.5F, CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_BRIGHT, 42));
+		ctx.drawTexture(EMBLEM_TEX, x + 9, y + 14, 26, 26, 0.0F, 0.0F, 64, 64, 64, 64);
+
+		int infoX = x + 42;
+		ctx.drawTextWithShadow(textRenderer, "VOID SOVEREIGN", infoX, y + 7, CrimsonTheme.TEXT_PRIMARY);
+		int titleW = textRenderer.getWidth("VOID SOVEREIGN");
+		CrimsonTheme.drawBadge(ctx, textRenderer, infoX + titleW + 6, y + 5, MOD_VERSION,
+				0x38FFB838, CrimsonTheme.GOLD, CrimsonTheme.GOLD);
+		int verW = textRenderer.getWidth(MOD_VERSION) + 10;
+		if (infoX + titleW + verW + 76 < x + w) {
+			CrimsonTheme.drawBadge(ctx, textRenderer, infoX + titleW + verW + 10, y + 5, "MC 1.21.1 · Fabric",
+					CrimsonTheme.BG_INPUT, CrimsonTheme.BORDER_SUBTLE, CrimsonTheme.TEXT_SECONDARY);
+		}
+
+		// [ID | EN] Language Toggle Buttons on top-right of Hero Card
+		int langBtnW = 24;
+		int langBtnH = 15;
+		int enX = x + w - langBtnW - 6;
+		int idX = enX - langBtnW - 3;
+		int langY = y + 6;
+		boolean hovId = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, idX, langY, langBtnW, langBtnH);
+		boolean hovEn = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, enX, langY, langBtnW, langBtnH);
+		CrimsonTheme.drawSubtleButton(ctx, textRenderer, idX, langY, langBtnW, langBtnH, "ID", infoLangIndonesian, hovId);
+		CrimsonTheme.drawSubtleButton(ctx, textRenderer, enX, langY, langBtnW, langBtnH, "EN", !infoLangIndonesian, hovEn);
+		addClippedClick(idX, langY, langBtnW, langBtnH, clipTop, clipBot, () -> infoLangIndonesian = true);
+		addClippedClick(enX, langY, langBtnW, langBtnH, clipTop, clipBot, () -> infoLangIndonesian = false);
+
+		String devLabel = (infoLangIndonesian ? "Developer: " : "Developer: ") + DEVELOPER_NAME;
+		ctx.drawTextWithShadow(textRenderer, trimToWidth(devLabel, w - 50), infoX, y + 22, CrimsonTheme.GOLD);
+		String repoLine = "GitHub: axellpemula/Hardcore-Tools  ·  MIT License";
+		ctx.drawTextWithShadow(textRenderer, trimToWidth(repoLine, w - 50), infoX, y + 35, CrimsonTheme.TEXT_MUTED);
+		y += heroH + 6;
+
+		// 2. Quick Keybinds Reference Strip
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w,
+				infoLangIndonesian ? "PINTASAN TOMBOL" : "SHORTCUTS & KEYBINDS");
+		y += 15;
+		int third = (w - 8) / 3;
+		String kMenu = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.openDashboardKey, "H");
+		String kWheel = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.radialWheelKey, "R");
+		String kFb = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.toggleFullbrightKey, "G");
+		drawKeybindInfoChip(ctx, x, y, third, "[" + kMenu + "]", infoLangIndonesian ? "Menu Utama" : "Dashboard");
+		drawKeybindInfoChip(ctx, x + third + 4, y, third, "[" + kWheel + "]", "Radial Wheel");
+		drawKeybindInfoChip(ctx, x + (third + 4) * 2, y, w - (third + 4) * 2, "[" + kFb + "]", "Fullbright");
+		y += 25;
+
+		// 3. Complete Feature Encyclopedia (Searchable!)
+		String q = this.searchQuery == null ? "" : this.searchQuery.trim().toLowerCase(Locale.ROOT);
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w,
+				infoLangIndonesian
+						? ("KETERANGAN FITUR (" + INFO_ENTRIES.size() + ")")
+						: ("FEATURE DESCRIPTIONS (" + INFO_ENTRIES.size() + ")"));
+		y += 16;
+
+		int descMaxW = Math.max(80, w - 18);
+		for (InfoEntry entry : INFO_ENTRIES) {
+			String desc = infoLangIndonesian ? entry.descId() : entry.descEn();
+			if (!q.isEmpty()
+					&& !entry.title().toLowerCase(Locale.ROOT).contains(q)
+					&& !entry.category().toLowerCase(Locale.ROOT).contains(q)
+					&& !desc.toLowerCase(Locale.ROOT).contains(q)) {
+				continue;
+			}
+
+			List<OrderedText> wrapped = textRenderer.wrapLines(Text.literal(desc), descMaxW);
+			int cardH = 24 + wrapped.size() * 10 + 5;
+			boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, w, cardH);
+			CrimsonTheme.drawCard(ctx, x, y, w, cardH, hov, entry.accentColor());
+
+			// Feature Icon + Title + Category Badge
+			ctx.drawTexture(entry.icon(), x + 8, y + 5, 14, 14, 0.0F, 0.0F, 64, 64, 64, 64);
+			int catW = textRenderer.getWidth(entry.category()) + 10;
+			ctx.drawTextWithShadow(textRenderer, trimToWidth(entry.title(), w - catW - 34), x + 26, y + 8, CrimsonTheme.TEXT_PRIMARY);
+			CrimsonTheme.drawBadge(ctx, textRenderer, x + w - catW - 6, y + 5, entry.category(),
+					CrimsonTheme.withAlpha(entry.accentColor(), 42), entry.accentColor(), entry.accentColor());
+
+			// Wrapped Feature Description Lines
+			int lineY = y + 23;
+			for (OrderedText line : wrapped) {
+				ctx.drawTextWithShadow(textRenderer, line, x + 9, lineY, CrimsonTheme.TEXT_SECONDARY);
+				lineY += 10;
+			}
+			y += cardH + 4;
+		}
+		return y;
+	}
+
+	private void drawKeybindInfoChip(DrawContext ctx, int x, int y, int w, String keyBadge, String label) {
+		CrimsonTheme.drawCard(ctx, x, y, w, 20, false, CrimsonTheme.CRIMSON_DARK);
+		int kw = textRenderer.getWidth(keyBadge) + 8;
+		CrimsonTheme.drawBadge(ctx, textRenderer, x + 6, y + 3, keyBadge,
+				0x38FFB838, CrimsonTheme.GOLD, CrimsonTheme.GOLD);
+		ctx.drawTextWithShadow(textRenderer, trimToWidth(label, w - kw - 14), x + kw + 10, y + 6, CrimsonTheme.TEXT_PRIMARY);
 	}
 
 	private void drawGameModeBtn(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int h,
@@ -2947,16 +3118,16 @@ public class HardcoreDashboardScreen extends Screen {
 		return y + 32;
 	}
 
-	private int drawToggleCard(DrawContext ctx, int x, int y, int w, String title, String subtitle, boolean state,
+	private int drawToggleCard(DrawContext ctx, int x, int y, int w, String title, boolean state,
 							   int clipTop, int clipBot, int mx, int my, Runnable onClick) {
-		int h = 26;
+		int h = 20;
 		boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, w, h);
 		CrimsonTheme.drawCard(ctx, x, y, w, h, hov, state ? CrimsonTheme.CRIMSON : 0);
-		ctx.drawTextWithShadow(textRenderer, trimToWidth(title, w - 46), x + 8, y + 4, CrimsonTheme.TEXT_PRIMARY);
-		ctx.drawTextWithShadow(textRenderer, trimToWidth(subtitle, w - 46), x + 8, y + 14, CrimsonTheme.TEXT_MUTED);
-		CrimsonTheme.drawPillSwitch(ctx, x + w - 35, y + 6, state, hov);
+		int titleCol = state ? CrimsonTheme.TEXT_PRIMARY : (hov ? CrimsonTheme.TEXT_PRIMARY : CrimsonTheme.TEXT_SECONDARY);
+		ctx.drawTextWithShadow(textRenderer, trimToWidth(title, w - 48), x + 8, y + 6, titleCol);
+		CrimsonTheme.drawPillSwitch(ctx, x + w - 36, y + 3, state, hov);
 		addClippedClick(x, y, w, h, clipTop, clipBot, onClick);
-		return y + h + 4;
+		return y + h + 3;
 	}
 
 	private int drawSliderCard(DrawContext ctx, String id, int x, int y, int w, String label, String badge, int value, int min, int max,

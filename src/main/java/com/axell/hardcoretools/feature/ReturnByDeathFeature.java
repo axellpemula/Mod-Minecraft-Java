@@ -23,6 +23,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityPose;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.ExperienceOrbEntity;
 import net.minecraft.entity.ItemEntity;
@@ -45,18 +46,26 @@ import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.Clearable;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.random.Random;
 import net.minecraft.world.World;
 
 public final class ReturnByDeathFeature {
-	// 5.0-Second 3-Act Choreography (100 ticks @ 20 TPS)
-	public static final int ACT1_TICKS = 30;            // 0.0s - 1.5s: Death Impact & Locked Fate
-	public static final int ACT2_TICKS = 60;            // 1.5s - 4.5s: Fast-Reverse Time Rewind
-	public static final int ACT3_TICKS = 10;            // 4.5s - 5.0s: Snap Back to Reality
-	public static final int TOTAL_SEQUENCE_TICKS = ACT1_TICKS + ACT2_TICKS + ACT3_TICKS; // 100 ticks (5.0s)
-	public static final int GRACE_TICKS = 70;           // 3.5s Chrono Grace invulnerability after snap-back
+	public static final String GHOST_DROP_TAG = "hc_rbd_ghost_drop";
+
+	// 17.5-Second Extended 3-Act Choreography (350 ticks @ 20 TPS)
+	public static final int ACT1_TICKS = 90;             // 0.0s - 4.5s: Death Collapse, Scattered Gear & Chained Screen
+	public static final int CRACK_SHATTER_TICKS = 42;    // 4.5s - 6.6s: Slow Full-Screen Cracks -> Glass Shatter -> Expanding Grayscale Dome
+	public static final int REWIND_FLIGHT_TICKS = 168;   // 6.6s - 15.0s: 8.4s Ultra-Smooth World & Camera Fast-Reverse
+	public static final int ACT2_TICKS = CRACK_SHATTER_TICKS + REWIND_FLIGHT_TICKS; // 210 ticks (4.5s - 15.0s)
+	public static final int ACT3_TICKS = 50;             // 15.0s - 17.5s: Shrinking Grayscale Dome & World Color Return
+	public static final int TOTAL_SEQUENCE_TICKS = ACT1_TICKS + ACT2_TICKS + ACT3_TICKS; // 350 ticks (17.5s)
+	public static final int GRACE_TICKS = 120;           // Covers 2.5s Act 3 awakening + 3.5s post-awakening safety
 
 	private static final long MAX_HISTORY_TICKS = 1280L; // ~64s buffer for 60s max window
 	private static final int MAX_BLOCK_JOURNAL = 24000;
@@ -137,6 +146,12 @@ public final class ReturnByDeathFeature {
 	) {
 	}
 
+	private record GhostScatteredDrop(
+			UUID entityUuid,
+			RegistryKey<World> dimension
+	) {
+	}
+
 	private static final class PlayerHistory {
 		final Deque<TrajectorySample> trajectory = new ArrayDeque<>();
 		final Deque<StateCheckpoint> checkpoints = new ArrayDeque<>();
@@ -149,26 +164,37 @@ public final class ReturnByDeathFeature {
 		final long deathTick;
 		final long targetTick;
 		final double rewoundSeconds;
+		final RegistryKey<World> deathDimension;
+		final double deathX;
+		final double deathY;
+		final double deathZ;
 		final StateCheckpoint targetCheckpoint;
 		final List<TrajectorySample> reversePath; // Ordered from deathTick (index 0) back to targetTick (last)
+		final List<GhostScatteredDrop> ghostDrops;
 		final long skyTimeAtDeath;
 		final long skyTimeAtTarget;
-		long lastAppliedVirtualTick;
 		boolean restoredFinalState = false;
 
 		ActiveRewindSession(UUID playerUuid, long startServerTick, long deathTick, long targetTick,
-							double rewoundSeconds, StateCheckpoint targetCheckpoint,
-							List<TrajectorySample> reversePath, long skyTimeAtDeath, long skyTimeAtTarget) {
+							double rewoundSeconds, RegistryKey<World> deathDimension,
+							double deathX, double deathY, double deathZ,
+							StateCheckpoint targetCheckpoint, List<TrajectorySample> reversePath,
+							List<GhostScatteredDrop> ghostDrops,
+							long skyTimeAtDeath, long skyTimeAtTarget) {
 			this.playerUuid = playerUuid;
 			this.startServerTick = startServerTick;
 			this.deathTick = deathTick;
 			this.targetTick = targetTick;
 			this.rewoundSeconds = rewoundSeconds;
+			this.deathDimension = deathDimension;
+			this.deathX = deathX;
+			this.deathY = deathY;
+			this.deathZ = deathZ;
 			this.targetCheckpoint = targetCheckpoint;
 			this.reversePath = reversePath;
+			this.ghostDrops = ghostDrops;
 			this.skyTimeAtDeath = skyTimeAtDeath;
 			this.skyTimeAtTarget = skyTimeAtTarget;
-			this.lastAppliedVirtualTick = deathTick;
 		}
 	}
 
@@ -195,6 +221,33 @@ public final class ReturnByDeathFeature {
 		LAST_KNOWN_ENTITY_HP.clear();
 		ENTITY_DEATHS.clear();
 		restoringWorld = false;
+	}
+
+	public static void onPlayerDisconnect(MinecraftServer server, ServerPlayerEntity player) {
+		if (server == null || player == null) return;
+		ActiveRewindSession session = ACTIVE_REWINDS.remove(player.getUuid());
+		if (session != null) {
+			discardGhostDrops(server, session);
+			if (!session.restoredFinalState) {
+				session.restoredFinalState = true;
+				player.setPose(EntityPose.STANDING);
+				restorePlayerFullCheckpoint(server, player, session.targetCheckpoint);
+			}
+		}
+	}
+
+	public static void abortAllActiveSessions(MinecraftServer server) {
+		if (server == null || ACTIVE_REWINDS.isEmpty()) return;
+		for (ActiveRewindSession session : new ArrayList<>(ACTIVE_REWINDS.values())) {
+			discardGhostDrops(server, session);
+			ServerPlayerEntity player = server.getPlayerManager().getPlayer(session.playerUuid);
+			if (player != null && !session.restoredFinalState) {
+				session.restoredFinalState = true;
+				player.setPose(EntityPose.STANDING);
+				restorePlayerFullCheckpoint(server, player, session.targetCheckpoint);
+			}
+		}
+		ACTIVE_REWINDS.clear();
 	}
 
 	public static boolean isRestoringWorld() {
@@ -227,7 +280,7 @@ public final class ReturnByDeathFeature {
 			return;
 		}
 		MinecraftServer server = world.getServer();
-		if (server == null || ACTIVE_REWINDS.size() > 0 && isAnyRewindInDimension(world.getRegistryKey())) {
+		if (server == null || (!ACTIVE_REWINDS.isEmpty() && isAnyRewindInDimension(world.getRegistryKey()))) {
 			return;
 		}
 		if (!hasActiveRbdObserverNear(world, pos)) {
@@ -355,7 +408,6 @@ public final class ReturnByDeathFeature {
 
 		PlayerHistory hist = PLAYER_HISTORIES.computeIfAbsent(player.getUuid(), k -> new PlayerHistory());
 		if (hist.checkpoints.isEmpty()) {
-			// Fallback safety if enabled moments before lethal blow
 			return false;
 		}
 
@@ -377,16 +429,21 @@ public final class ReturnByDeathFeature {
 		long actualTargetTick = chosenCheckpoint.tick;
 		double rewoundSec = Math.max(0.5D, Math.round(((nowTick - actualTargetTick) / 20.0D) * 10.0D) / 10.0D);
 
+		ServerWorld deathWorld = player.getServerWorld();
+		double deathX = player.getX();
+		double deathY = player.getY();
+		double deathZ = player.getZ();
+
 		// Build reverse trajectory from death moment (index 0) back to actualTargetTick (last index)
 		ServerWorld overworld = server.getOverworld();
 		long skyDeath = overworld != null ? overworld.getTimeOfDay() : 0L;
 		List<TrajectorySample> reversePath = new ArrayList<>();
 		reversePath.add(new TrajectorySample(
 				nowTick,
-				player.getServerWorld().getRegistryKey(),
-				player.getX(),
-				player.getY(),
-				player.getZ(),
+				deathWorld.getRegistryKey(),
+				deathX,
+				deathY,
+				deathZ,
 				player.getYaw(),
 				player.getPitch(),
 				skyDeath
@@ -410,13 +467,22 @@ public final class ReturnByDeathFeature {
 				chosenCheckpoint.overworldTimeOfDay
 		));
 
-		// Freeze player on the brink of death (1.0F HP so vanilla DeathScreen & Hardcore Spectator lock NEVER fire!)
+		// Authentic Death Collapse: scatter real invulnerable un-pickupable 3D gear onto the ground & empty bag!
 		player.closeHandledScreen();
+		List<GhostScatteredDrop> ghostDrops = scatterPlayerInventoryDramatically(player, deathWorld, deathX, deathY, deathZ);
+
+		// Collapse body prone onto ground with white death-poof cloud & death sound (while keeping 1.0F HP so Hardcore never locks!)
 		player.setHealth(1.0F);
+		player.setPose(EntityPose.SWIMMING);
+		player.hurtTime = 10;
+		player.maxHurtTime = 10;
 		player.setVelocity(0.0D, 0.0D, 0.0D);
 		player.velocityModified = true;
 		player.setFireTicks(0);
 		player.fallDistance = 0.0F;
+
+		deathWorld.spawnParticles(ParticleTypes.POOF, deathX, deathY + 0.5D, deathZ, 28, 0.45D, 0.25D, 0.45D, 0.04D);
+		deathWorld.playSound(null, deathX, deathY, deathZ, SoundEvents.ENTITY_PLAYER_DEATH, SoundCategory.PLAYERS, 1.0F, 0.92F);
 
 		ActiveRewindSession session = new ActiveRewindSession(
 				player.getUuid(),
@@ -424,8 +490,13 @@ public final class ReturnByDeathFeature {
 				nowTick,
 				actualTargetTick,
 				rewoundSec,
+				deathWorld.getRegistryKey(),
+				deathX,
+				deathY,
+				deathZ,
 				chosenCheckpoint,
 				reversePath,
+				ghostDrops,
 				skyDeath,
 				chosenCheckpoint.overworldTimeOfDay
 		);
@@ -447,17 +518,145 @@ public final class ReturnByDeathFeature {
 				reversePath
 		);
 		HardcoreNetworking.sendRewindEvent(player, payloadJson);
-		HardcoreToolsMod.LOGGER.info("Return by Death triggered for {} (rewinding {}s)", player.getName().getString(), rewoundSec);
+		HardcoreToolsMod.LOGGER.info("Return by Death triggered for {} (rewinding {}s over 17.5s)", player.getName().getString(), rewoundSec);
 		return true;
+	}
+
+	private static List<GhostScatteredDrop> scatterPlayerInventoryDramatically(ServerPlayerEntity player, ServerWorld world,
+																			  double x, double y, double z) {
+		List<GhostScatteredDrop> spawned = new ArrayList<>();
+		PlayerInventory inv = player.getInventory();
+		Random rng = world.getRandom();
+
+		List<ItemStack> allStacks = new ArrayList<>();
+		for (int i = 0; i < inv.main.size(); i++) {
+			ItemStack s = inv.main.get(i);
+			if (!s.isEmpty()) {
+				allStacks.add(s.copy());
+				inv.main.set(i, ItemStack.EMPTY);
+			}
+		}
+		for (int i = 0; i < inv.armor.size(); i++) {
+			ItemStack s = inv.armor.get(i);
+			if (!s.isEmpty()) {
+				allStacks.add(s.copy());
+				inv.armor.set(i, ItemStack.EMPTY);
+			}
+		}
+		for (int i = 0; i < inv.offHand.size(); i++) {
+			ItemStack s = inv.offHand.get(i);
+			if (!s.isEmpty()) {
+				allStacks.add(s.copy());
+				inv.offHand.set(i, ItemStack.EMPTY);
+			}
+		}
+		player.playerScreenHandler.sendContentUpdates();
+
+		// Scatter up to 41 real 3D item stacks around the corpse exactly like vanilla death dropAll()!
+		for (ItemStack stack : allStacks) {
+			float speed = rng.nextFloat() * 0.36F + 0.08F;
+			float yawRad = rng.nextFloat() * ((float) Math.PI * 2.0F);
+			double vx = -MathHelper.sin(yawRad) * speed;
+			double vz = MathHelper.cos(yawRad) * speed;
+			double vy = 0.22D + rng.nextDouble() * 0.14D;
+
+			ItemEntity drop = new ItemEntity(world, x, y + 0.55D, z, stack, vx, vy, vz);
+			drop.setPickupDelayInfinite();
+			drop.setNeverDespawn();
+			drop.setInvulnerable(true);
+			drop.addCommandTag(GHOST_DROP_TAG);
+			if (world.spawnEntity(drop)) {
+				spawned.add(new GhostScatteredDrop(drop.getUuid(), world.getRegistryKey()));
+			}
+		}
+		return spawned;
+	}
+
+	private static void tickScatteredDropsReverseSuction(MinecraftServer server, ServerPlayerEntity player,
+														 ActiveRewindSession session, long elapsed) {
+		if (session.ghostDrops.isEmpty()) {
+			return;
+		}
+		ServerWorld w = server.getWorld(session.deathDimension);
+		if (w == null) {
+			return;
+		}
+
+		// Phase A (90..119 ticks = 4.5s..6.0s): Zero-gravity eerie levitation as screen fractures!
+		if (elapsed >= ACT1_TICKS && elapsed < ACT1_TICKS + 30) {
+			for (GhostScatteredDrop gd : session.ghostDrops) {
+				Entity ent = w.getEntity(gd.entityUuid);
+				if (ent instanceof ItemEntity item && item.isAlive()) {
+					item.setNoGravity(true);
+					item.setVelocity(item.getVelocity().x * 0.82D, 0.024D, item.getVelocity().z * 0.82D);
+					item.velocityModified = true;
+				}
+			}
+			return;
+		}
+
+		// Phase B (120..148 ticks = 6.0s..7.4s): Fast magnetic reverse-suction back into the player's body!
+		if (elapsed >= ACT1_TICKS + 30 && elapsed < ACT1_TICKS + 58) {
+			double pullProgress = (elapsed - (ACT1_TICKS + 30)) / 28.0D;
+			double pullFactor = 0.24D + pullProgress * 0.50D;
+			boolean sameDim = player != null && player.getServerWorld().getRegistryKey().equals(session.deathDimension);
+			double targetX = sameDim ? player.getX() : session.deathX;
+			double targetY = (sameDim ? player.getY() : session.deathY) + 0.78D;
+			double targetZ = sameDim ? player.getZ() : session.deathZ;
+
+			Iterator<GhostScatteredDrop> it = session.ghostDrops.iterator();
+			while (it.hasNext()) {
+				GhostScatteredDrop gd = it.next();
+				Entity ent = w.getEntity(gd.entityUuid);
+				if (!(ent instanceof ItemEntity item) || !item.isAlive()) {
+					it.remove();
+					continue;
+				}
+				item.setNoGravity(true);
+				double dx = targetX - item.getX();
+				double dy = targetY - item.getY();
+				double dz = targetZ - item.getZ();
+				double distSq = dx * dx + dy * dy + dz * dz;
+				if (distSq < 0.45D || pullProgress >= 0.96D) {
+					w.spawnParticles(ParticleTypes.REVERSE_PORTAL, item.getX(), item.getY() + 0.15D, item.getZ(),
+							4, 0.12D, 0.12D, 0.12D, 0.02D);
+					item.discard();
+					it.remove();
+				} else {
+					item.setVelocity(dx * pullFactor, dy * pullFactor + 0.03D, dz * pullFactor);
+					item.velocityModified = true;
+				}
+			}
+			return;
+		}
+
+		if (elapsed >= ACT1_TICKS + 58) {
+			discardGhostDrops(server, session);
+		}
+	}
+
+	private static void discardGhostDrops(MinecraftServer server, ActiveRewindSession session) {
+		for (GhostScatteredDrop gd : session.ghostDrops) {
+			ServerWorld w = server.getWorld(gd.dimension);
+			if (w != null) {
+				Entity ent = w.getEntity(gd.entityUuid);
+				if (ent != null) {
+					ent.discard();
+				}
+			}
+		}
+		session.ghostDrops.clear();
 	}
 
 	private static String buildRewindPayloadJson(boolean active, String deathMessage, int score, boolean hardcore,
 												 double rewoundSec, List<TrajectorySample> reversePath) {
 		JsonObject root = new JsonObject();
 		root.addProperty("active", active);
-		root.addProperty("durationMs", TOTAL_SEQUENCE_TICKS * 50L); // 5000ms
-		root.addProperty("act1Ms", ACT1_TICKS * 50L);               // 1500ms
-		root.addProperty("act2Ms", (ACT1_TICKS + ACT2_TICKS) * 50L);// 4500ms
+		root.addProperty("durationMs", TOTAL_SEQUENCE_TICKS * 50L);                       // 17500ms (17.5s)
+		root.addProperty("act1Ms", ACT1_TICKS * 50L);                                     // 4500ms  (4.5s)
+		root.addProperty("shatterMs", (ACT1_TICKS + 30) * 50L);                           // 6000ms  (6.0s glass burst)
+		root.addProperty("rewindStartMs", (ACT1_TICKS + CRACK_SHATTER_TICKS) * 50L);      // 6600ms  (6.6s smooth flight start)
+		root.addProperty("act2Ms", (ACT1_TICKS + ACT2_TICKS) * 50L);                      // 15000ms (15.0s Act 3 start)
 		root.addProperty("deathMessage", deathMessage);
 		root.addProperty("score", score);
 		root.addProperty("worldHardcore", hardcore);
@@ -469,9 +668,9 @@ public final class ReturnByDeathFeature {
 			long endTick = reversePath.get(reversePath.size() - 1).tick;
 			long span = Math.max(1L, startTick - endTick);
 
-			// Downsample to at most ~90 keyframes so packet stays ultra-compact (< 5 KB)
+			// Keep up to ~150 keyframes for ultra-silky 8.4s reverse flight (< 8 KB packet)
 			int total = reversePath.size();
-			int step = Math.max(1, total / 85);
+			int step = Math.max(1, total / 145);
 			for (int i = 0; i < total; i += step) {
 				TrajectorySample s = reversePath.get(i);
 				framesArr.add(serializeFrame(s, startTick, span));
@@ -501,7 +700,7 @@ public final class ReturnByDeathFeature {
 	private static void onServerTick(MinecraftServer server) {
 		long tick = server.getTicks();
 
-		// 1. Advance active 5.0-second Return by Death rewinds
+		// 1. Advance active 17.5-second Return by Death rewinds
 		if (!ACTIVE_REWINDS.isEmpty()) {
 			tickActiveRewinds(server, tick);
 		}
@@ -530,7 +729,6 @@ public final class ReturnByDeathFeature {
 				recordStateCheckpoint(player, hist, tick);
 			}
 
-			// Prune player history older than MAX_HISTORY_TICKS
 			long minKeepTick = tick - MAX_HISTORY_TICKS;
 			while (hist.trajectory.size() > 2 && hist.trajectory.peekFirst().tick < minKeepTick) {
 				hist.trajectory.pollFirst();
@@ -556,6 +754,7 @@ public final class ReturnByDeathFeature {
 			ActiveRewindSession session = entry.getValue();
 			ServerPlayerEntity player = server.getPlayerManager().getPlayer(session.playerUuid);
 			if (player == null) {
+				discardGhostDrops(server, session);
 				it.remove();
 				continue;
 			}
@@ -565,15 +764,31 @@ public final class ReturnByDeathFeature {
 			player.fallDistance = 0.0F;
 
 			if (elapsed <= ACT1_TICKS) {
-				// ==================== BABAK 1 (0.0s - 1.5s): FROZEN DEATH MOMENT ====================
+				// ==================== BABAK 1 (0.0s - 4.5s): COLLAPSED CORPSE & SCATTERED GEAR ====================
 				player.setHealth(1.0F);
+				player.setPose(EntityPose.SWIMMING);
 				player.setVelocity(0.0D, 0.0D, 0.0D);
 				player.velocityModified = true;
-				freezeNearbyHostiles(player, 32.0D);
+				freezeNearbyHostiles(player, 36.0D);
 			} else if (elapsed < ACT1_TICKS + ACT2_TICKS) {
-				// ==================== BABAK 2 (1.5s - 4.5s): FAST-REVERSE TIME REWIND ====================
+				// ==================== BABAK 2 (4.5s - 15.0s): SHATTER -> GRAYSCALE -> 8.4s SMOOTH REWIND ====================
 				player.setHealth(Math.max(1.0F, player.getHealth()));
-				double rawP = (elapsed - ACT1_TICKS) / (double) ACT2_TICKS;
+				tickScatteredDropsReverseSuction(server, player, session, elapsed);
+
+				int rewindStartTick = ACT1_TICKS + CRACK_SHATTER_TICKS; // 132 ticks (6.6s)
+				if (elapsed < rewindStartTick) {
+					// 4.5s - 6.6s: Screen cracking -> shattering -> expanding grayscale dome while items levitate/pull!
+					if (elapsed >= ACT1_TICKS + 30) {
+						player.setPose(EntityPose.STANDING);
+					}
+					player.setVelocity(0.0D, 0.0D, 0.0D);
+					player.velocityModified = true;
+					freezeNearbyHostiles(player, 36.0D);
+					continue;
+				}
+
+				player.setPose(EntityPose.STANDING);
+				double rawP = (elapsed - rewindStartTick) / (double) REWIND_FLIGHT_TICKS;
 				double easedP = easeInOutSine(rawP);
 				long span = Math.max(1L, session.deathTick - session.targetTick);
 				long currentVirtualTick = Math.round(session.deathTick - easedP * span);
@@ -588,15 +803,14 @@ public final class ReturnByDeathFeature {
 				}
 
 				// Undo blocks, respawn dead/exploded mobs, discard post-born drops/projectiles, & rewind mob positions
-				rewindWorldSlice(server, player, currentVirtualTick, session.deathTick);
-				session.lastAppliedVirtualTick = currentVirtualTick;
+				rewindWorldSlice(server, player, currentVirtualTick);
 
-				// Move server player every 6 ticks (or immediately on dimension cross) so chunks stay loaded
-				// while letting Client's 240 FPS GameRendererMixin glide smoothly without packet jitter!
+				// Move server player every 8 ticks (or immediately on dimension cross) so chunks stay loaded
+				// while Client's 240 FPS GameRendererMixin glides along the exact same curve without packet jitter!
 				TrajectorySample sample = sampleReversePath(session.reversePath, currentVirtualTick);
 				if (sample != null) {
 					boolean crossDim = !player.getServerWorld().getRegistryKey().equals(sample.dimension);
-					if (crossDim || elapsed % 6L == 0L) {
+					if (crossDim || elapsed % 8L == 0L) {
 						ServerWorld destWorld = server.getWorld(sample.dimension);
 						if (destWorld != null) {
 							player.teleport(destWorld, sample.x, sample.y, sample.z, sample.yaw, sample.pitch);
@@ -604,12 +818,14 @@ public final class ReturnByDeathFeature {
 						}
 					}
 				}
-				freezeNearbyHostiles(player, 36.0D);
+				freezeNearbyHostiles(player, 38.0D);
 			} else {
-				// ==================== BABAK 3 (4.5s - 5.0s): SNAP BACK TO REALITY ====================
+				// ==================== BABAK 3 (15.0s - 17.5s): SHRINKING GRAYSCALE & AWAKENING ====================
 				if (!session.restoredFinalState) {
 					session.restoredFinalState = true;
-					rewindWorldSlice(server, player, session.targetTick, session.deathTick);
+					discardGhostDrops(server, session);
+					player.setPose(EntityPose.STANDING);
+					rewindWorldSlice(server, player, session.targetTick);
 					restorePlayerFullCheckpoint(server, player, session.targetCheckpoint);
 
 					PlayerProfile profile = HardcoreStateManager.getProfile(player);
@@ -621,7 +837,6 @@ public final class ReturnByDeathFeature {
 
 					PlayerHistory hist = PLAYER_HISTORIES.computeIfAbsent(player.getUuid(), k -> new PlayerHistory());
 					hist.graceUntilTick = nowTick + GRACE_TICKS;
-					// Purge post-target history so timeline branches cleanly from -60s!
 					while (!hist.trajectory.isEmpty() && hist.trajectory.peekLast().tick > session.targetTick) {
 						hist.trajectory.pollLast();
 					}
@@ -630,6 +845,8 @@ public final class ReturnByDeathFeature {
 					}
 					captureImmediateBaseline(player);
 				}
+
+				freezeNearbyHostiles(player, 24.0D);
 
 				if (elapsed >= TOTAL_SEQUENCE_TICKS) {
 					it.remove();
@@ -643,7 +860,7 @@ public final class ReturnByDeathFeature {
 		}
 	}
 
-	private static void rewindWorldSlice(MinecraftServer server, ServerPlayerEntity player, long virtualTick, long deathTick) {
+	private static void rewindWorldSlice(MinecraftServer server, ServerPlayerEntity player, long virtualTick) {
 		restoringWorld = true;
 		try {
 			// 1. Undo Block Journal entries newer than virtualTick in strict LIFO order
@@ -669,7 +886,7 @@ public final class ReturnByDeathFeature {
 						}
 					}
 				}
-				if (particlesSpawned < 18 && w == player.getServerWorld()) {
+				if (particlesSpawned < 16 && w == player.getServerWorld()) {
 					particlesSpawned++;
 					w.spawnParticles(
 							ParticleTypes.REVERSE_PORTAL,
@@ -718,6 +935,10 @@ public final class ReturnByDeathFeature {
 			long serverNow = server.getTicks();
 			Box area = player.getBoundingBox().expand(72.0D);
 			for (Entity ent : pw.getOtherEntities(player, area, e -> e != null && !(e instanceof PlayerEntity) && !(e instanceof EnderDragonPart))) {
+				if (ent.getCommandTags().contains(GHOST_DROP_TAG)) {
+					// Managed smoothly by tickScatteredDropsReverseSuction!
+					continue;
+				}
 				long birthTick = serverNow - ent.age;
 				boolean transientType = (ent instanceof ItemEntity)
 						|| (ent instanceof ExperienceOrbEntity)
@@ -766,7 +987,6 @@ public final class ReturnByDeathFeature {
 				destWorld = server.getOverworld();
 			}
 
-			// Ensure safe footing if the -60s position was already below world bottom (e.g. prolonged End void fall)
 			double safeX = cp.x;
 			double safeY = cp.y;
 			double safeZ = cp.z;
@@ -783,6 +1003,7 @@ public final class ReturnByDeathFeature {
 				}
 			}
 
+			player.setPose(EntityPose.STANDING);
 			player.teleport(destWorld, safeX, safeY, safeZ, cp.yaw, cp.pitch);
 			player.setVelocity(0.0D, 0.0D, 0.0D);
 			player.velocityModified = true;
@@ -805,7 +1026,7 @@ public final class ReturnByDeathFeature {
 			}
 			player.playerScreenHandler.sendContentUpdates();
 
-			// Restore Vitals, Hunger & Air (guarantee at least 2.0 hearts so player never re-dies on arrival)
+			// Restore Vitals, Hunger & Air
 			player.setHealth(Math.min(player.getMaxHealth(), Math.max(4.0F, cp.health)));
 			HungerManager hm = player.getHungerManager();
 			hm.setFoodLevel(cp.foodLevel);
@@ -818,7 +1039,7 @@ public final class ReturnByDeathFeature {
 			player.experienceProgress = cp.xpProgress;
 			player.totalExperience = cp.totalXp;
 
-			// Restore Status Effects + 3.5s Chrono Grace Resistance
+			// Restore Status Effects + Chrono Grace Resistance
 			player.clearStatusEffects();
 			for (StatusEffectInstance inst : cp.statusEffects) {
 				player.addStatusEffect(new StatusEffectInstance(inst));

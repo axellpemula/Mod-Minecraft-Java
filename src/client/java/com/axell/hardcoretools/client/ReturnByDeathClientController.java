@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Locale;
 
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 
 import com.axell.hardcoretools.client.gui.CrimsonTheme;
 import com.axell.hardcoretools.client.gui.ReturnByDeathScreen;
@@ -15,6 +17,9 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.Framebuffer;
+import net.minecraft.client.gl.ShaderProgram;
+import net.minecraft.client.gl.SimpleFramebuffer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.render.BufferBuilder;
@@ -46,25 +51,41 @@ public final class ReturnByDeathClientController {
 	) {
 	}
 
+	private static ShaderProgram chronoGrayscaleShader;
+	private static SimpleFramebuffer snapshotFbo;
+
 	private static boolean active = false;
 	private static long startMs = 0L;
-	private static long durationMs = 5000L;
-	private static long act1Ms = 1500L;
-	private static long act2Ms = 4500L;
+	private static long durationMs = 17500L;     // 0.0s - 17.5s total
+	private static long act1Ms = 4500L;          // 0.0s - 4.5s  Locked Chained Death Screen
+	private static long shatterMs = 6000L;       // 4.5s - 6.0s  Slow Full-Screen Spider-Web Cracks -> 6.0s Shatter!
+	private static long rewindStartMs = 6600L;   // 6.6s - 15.0s Ultra-Smooth 8.4s Fast-Reverse Flight
+	private static long act2Ms = 15000L;         // 15.0s - 17.5s Act 3 Shrinking Grayscale Dome
 	private static String deathMessage = "You met a fatal end";
 	private static int score = 0;
 	private static boolean worldHardcore = false;
 	private static double rewoundSeconds = 60.0D;
 	private static List<RewindFrame> frames = List.of();
 
-	// Sound choreography state
-	private static boolean playedSecondBeat = false;
-	private static boolean playedShatterStart = false;
-	private static boolean playedSnapBack = false;
+	// Multi-Act Sound Choreography State
+	private static int lastHeartbeatIdx = 0;
+	private static int lastCrackCreakIdx = -1;
+	private static boolean playedGlassShatter = false;
+	private static boolean playedGrayscaleBoom = false;
+	private static boolean playedAct3Release = false;
+	private static boolean playedColorAwakening = false;
 	private static int lastClockTickIdx = -1;
 	private static long lockShakeClickMs = 0L;
 
 	private ReturnByDeathClientController() {
+	}
+
+	public static void setChronoGrayscaleShader(ShaderProgram program) {
+		chronoGrayscaleShader = program;
+	}
+
+	public static ShaderProgram getChronoGrayscaleShader() {
+		return chronoGrayscaleShader;
 	}
 
 	public static boolean isActive() {
@@ -78,6 +99,14 @@ public final class ReturnByDeathClientController {
 
 	public static long getAct1Ms() {
 		return act1Ms;
+	}
+
+	public static long getShatterMs() {
+		return shatterMs;
+	}
+
+	public static long getRewindStartMs() {
+		return rewindStartMs;
 	}
 
 	public static long getAct2Ms() {
@@ -114,6 +143,60 @@ public final class ReturnByDeathClientController {
 		playVanillaSound("block.respawn_anchor.deplete", 1.45F);
 	}
 
+	/**
+	 * Sideways corpse-collapse camera roll:
+	 * - 0.0s .. 0.45s: collapses smoothly from 0° to 56° onto the ground
+	 * - 0.45s .. 6.0s: lies collapsed at 56° while items scatter & glass slowly cracks
+	 * - 6.0s .. 7.2s: rises smoothly back to 0° upright as items fly back & rewind begins!
+	 */
+	public static float getDeathCameraRollDegrees() {
+		if (!active) return 0.0F;
+		long elapsed = getElapsedMs();
+		if (elapsed < 450L) {
+			double t = elapsed / 450.0D;
+			double ease = 1.0D - Math.pow(1.0D - t, 3.0D);
+			return (float) (56.0D * ease);
+		}
+		if (elapsed < shatterMs) {
+			double shudder = Math.sin(elapsed * 0.012D) * 1.1D;
+			return (float) (56.0D + shudder);
+		}
+		long riseSpan = 1200L; // 6.0s .. 7.2s
+		if (elapsed < shatterMs + riseSpan) {
+			double t = (elapsed - shatterMs) / (double) riseSpan;
+			double ease = -(Math.cos(Math.PI * t) - 1.0D) / 2.0D;
+			return (float) (56.0D * (1.0D - ease));
+		}
+		return 0.0F;
+	}
+
+	/**
+	 * Expanding & Shrinking Circular Grayscale Dome Fraction (0.0 = none, 1.08 = covers 100% of screen corners):
+	 * - 0.0s .. 5.85s: 0.0
+	 * - 5.85s .. 7.15s: expands smoothly from center (0.0 -> 1.08) right after glass shatters!
+	 * - 7.15s .. 15.0s: stays at 1.08 (entire world vision is monochrome gray during fast-reverse!)
+	 * - 15.0s .. 17.5s: shrinks smoothly in Act 3 (1.08 -> 0.0) revealing natural world colors!
+	 */
+	public static float getGrayscaleRadiusFraction(long elapsed) {
+		long expandStart = shatterMs - 150L; // 5850ms
+		long expandEnd = shatterMs + 1150L;  // 7150ms
+		if (elapsed <= expandStart) {
+			return 0.0F;
+		}
+		if (elapsed < expandEnd) {
+			double t = (elapsed - expandStart) / (double) Math.max(1L, expandEnd - expandStart);
+			return (float) (easeInOutCubic(t) * 1.08D);
+		}
+		if (elapsed < act2Ms) {
+			return 1.08F;
+		}
+		if (elapsed < durationMs) {
+			double t = (elapsed - act2Ms) / (double) Math.max(1L, durationMs - act2Ms);
+			return (float) ((1.0D - easeInOutCubic(t)) * 1.08D);
+		}
+		return 0.0F;
+	}
+
 	public static void handleServerPayload(String json) {
 		try {
 			JsonObject r = GSON.fromJson(json, JsonObject.class);
@@ -124,9 +207,11 @@ public final class ReturnByDeathClientController {
 				return;
 			}
 
-			durationMs = r.has("durationMs") ? r.get("durationMs").getAsLong() : 5000L;
-			act1Ms = r.has("act1Ms") ? r.get("act1Ms").getAsLong() : 1500L;
-			act2Ms = r.has("act2Ms") ? r.get("act2Ms").getAsLong() : 4500L;
+			durationMs = r.has("durationMs") ? r.get("durationMs").getAsLong() : 17500L;
+			act1Ms = r.has("act1Ms") ? r.get("act1Ms").getAsLong() : 4500L;
+			shatterMs = r.has("shatterMs") ? r.get("shatterMs").getAsLong() : 6000L;
+			rewindStartMs = r.has("rewindStartMs") ? r.get("rewindStartMs").getAsLong() : 6600L;
+			act2Ms = r.has("act2Ms") ? r.get("act2Ms").getAsLong() : 15000L;
 			deathMessage = r.has("deathMessage") ? r.get("deathMessage").getAsString() : "You died";
 			score = r.has("score") ? r.get("score").getAsInt() : 0;
 			worldHardcore = r.has("worldHardcore") && r.get("worldHardcore").getAsBoolean();
@@ -153,16 +238,19 @@ public final class ReturnByDeathClientController {
 
 			active = true;
 			startMs = System.currentTimeMillis();
-			playedSecondBeat = false;
-			playedShatterStart = false;
-			playedSnapBack = false;
+			lastHeartbeatIdx = 0;
+			lastCrackCreakIdx = -1;
+			playedGlassShatter = false;
+			playedGrayscaleBoom = false;
+			playedAct3Release = false;
+			playedColorAwakening = false;
 			lastClockTickIdx = -1;
 			lockShakeClickMs = 0L;
 
-			// Act 1 Opening Audio: Deep Heartbeat + Abyssal Bell + Eerie Witch's Call Chord!
-			playVanillaSound("entity.warden.heartbeat", 0.66F);
+			// Act 1 (0.0s): Heavy Death Impact + Abyssal Bell + Witch's Call
+			playVanillaSound("entity.warden.heartbeat", 0.64F);
 			playVanillaSound("block.bell.resonate", 0.50F);
-			playVanillaSound("entity.elder_guardian.curse", 0.54F);
+			playVanillaSound("entity.elder_guardian.curse", 0.52F);
 
 			MinecraftClient mc = MinecraftClient.getInstance();
 			ClientStateSnapshot.INSTANCE.upgraderModalOpen = false;
@@ -195,7 +283,7 @@ public final class ReturnByDeathClientController {
 			return;
 		}
 
-		// Keep ReturnByDeathScreen active during Act 1 (0..1.5s) & Act 2 (1.5..4.5s), then release at 4.5s for Act 3!
+		// Keep ReturnByDeathScreen open through Act 1 (0..4.5s) & Act 2 (4.5..15.0s), then release at 15.0s for Act 3!
 		if (elapsed < act2Ms) {
 			if (!(client.currentScreen instanceof ReturnByDeathScreen)) {
 				client.setScreen(new ReturnByDeathScreen());
@@ -204,47 +292,75 @@ public final class ReturnByDeathClientController {
 			client.setScreen(null);
 		}
 
-		// Multi-Act Audio Choreography
-		if (!playedSecondBeat && elapsed >= 760L) {
-			playedSecondBeat = true;
-			playVanillaSound("entity.warden.heartbeat", 0.84F);
-			playVanillaSound("block.chain.place", 0.62F);
+		// 1. Act 1 (0.0s - 4.5s): Slow ominous heartbeats & tightening chains
+		if (elapsed < act1Ms) {
+			int beatIdx = (int) (elapsed / 1120L); // Beats at ~1.12s, 2.24s, 3.36s
+			if (beatIdx > lastHeartbeatIdx) {
+				lastHeartbeatIdx = beatIdx;
+				playVanillaSound("entity.warden.heartbeat", 0.68F + beatIdx * 0.08F);
+				if (beatIdx >= 2) {
+					playVanillaSound("block.chain.place", 0.58F + beatIdx * 0.08F);
+				}
+			}
 		}
 
-		if (!playedShatterStart && elapsed >= act1Ms) {
-			playedShatterStart = true;
-			playVanillaSound("block.glass.break", 0.72F);
-			playVanillaSound("block.portal.trigger", 1.65F);
-			playVanillaSound("block.beacon.deactivate", 0.78F);
+		// 2. Act 2A (4.5s - 6.0s): Slow creeping glass fracture creaks across the screen!
+		if (elapsed >= act1Ms && elapsed < shatterMs) {
+			double crackP = (elapsed - act1Ms) / (double) Math.max(1L, shatterMs - act1Ms);
+			int creakIdx = (int) (crackP * 6.0D);
+			if (creakIdx != lastCrackCreakIdx) {
+				lastCrackCreakIdx = creakIdx;
+				playVanillaSound("block.glass.hit", 0.58F + creakIdx * 0.14F);
+				playVanillaSound("block.amethyst_block.chime", 0.52F + creakIdx * 0.10F);
+			}
 		}
 
-		if (elapsed >= act1Ms && elapsed < act2Ms) {
-			double rawP = (elapsed - act1Ms) / (double) Math.max(1L, act2Ms - act1Ms);
-			// Accelerating pocket-watch reverse ticks (24 ticks across 3.0s)
-			int tickIdx = (int) (Math.pow(rawP, 0.82) * 24.0);
+		// 3. 6.0s Climax: Full-Screen Glass Shatter + Expanding Grayscale Time-Freeze!
+		if (!playedGlassShatter && elapsed >= shatterMs) {
+			playedGlassShatter = true;
+			playVanillaSound("block.glass.break", 0.68F);
+			playVanillaSound("block.glass.break", 1.08F);
+			playVanillaSound("block.respawn_anchor.deplete", 0.75F);
+		}
+		if (!playedGrayscaleBoom && elapsed >= shatterMs + 180L) {
+			playedGrayscaleBoom = true;
+			playVanillaSound("block.beacon.deactivate", 0.62F);
+			playVanillaSound("block.portal.trigger", 1.55F);
+		}
+
+		// 4. Act 2C (6.6s - 15.0s): Smooth 8.4s pocket-watch reverse ticks & astral chimes
+		if (elapsed >= rewindStartMs && elapsed < act2Ms) {
+			double rawP = (elapsed - rewindStartMs) / (double) Math.max(1L, act2Ms - rewindStartMs);
+			int tickIdx = (int) (easeInOutSine(rawP) * 44.0D);
 			if (tickIdx != lastClockTickIdx) {
 				lastClockTickIdx = tickIdx;
-				float tickPitch = (tickIdx % 2 == 0) ? 1.62F : 1.28F;
+				float tickPitch = (tickIdx % 2 == 0) ? 1.56F : 1.24F;
 				playVanillaSound("block.comparator.click", tickPitch);
-				if (tickIdx % 3 == 0) {
-					float chimePitch = 0.62F + (float) (rawP * 1.12F);
+				if (tickIdx % 4 == 0) {
+					float chimePitch = 0.60F + (float) (rawP * 0.95F);
 					playVanillaSound("block.amethyst_block.chime", chimePitch);
 				}
 			}
 		}
 
-		if (!playedSnapBack && elapsed >= act2Ms) {
-			playedSnapBack = true;
-			playVanillaSound("block.respawn_anchor.set_spawn", 1.25F);
+		// 5. Act 3 (15.0s - 17.5s): Shrinking Grayscale Dome & Return of World Color!
+		if (!playedAct3Release && elapsed >= act2Ms) {
+			playedAct3Release = true;
+			playVanillaSound("block.beacon.activate", 1.18F);
+			playVanillaSound("block.respawn_anchor.set_spawn", 1.15F);
+			playVanillaSound("entity.player.breath", 0.92F);
+		}
+		if (!playedColorAwakening && elapsed >= durationMs - 380L) {
+			playedColorAwakening = true;
 			playVanillaSound("block.amethyst_cluster.break", 1.35F);
-			playVanillaSound("entity.player.breath", 0.94F);
 			playVanillaSound("entity.warden.heartbeat", 1.0F);
 		}
 	}
 
 	/**
-	 * Runs right before Camera#update in GameRenderer#renderWorld at native monitor FPS (60/144/240 Hz)
-	 * so the 3D world glides backward with zero 20-TPS packet stutter!
+	 * Runs right before Camera#update in GameRenderer#renderWorld at native monitor FPS (60/144/240 Hz):
+	 * - During 0.0s..6.6s: lowers eye position near the ground like a collapsed corpse, then smoothly rises back up
+	 * - During 6.6s..15.0s: glides backward along a C1-continuous Catmull-Rom cubic spline across the last 60s!
 	 */
 	public static void onBeforeWorldRender() {
 		if (!active || frames.isEmpty()) {
@@ -263,58 +379,78 @@ public final class ReturnByDeathClientController {
 
 		String currentDim = mc.world.getRegistryKey().getValue().toString();
 
-		if (elapsed < act1Ms) {
-			// Act 1: Hold steady at death spot with subtle dying heartbeat shudder
+		if (elapsed < rewindStartMs) {
 			RewindFrame first = frames.get(0);
 			if (first.dim.equals(currentDim)) {
-				double beat = 0.0D;
-				if (elapsed < 260L) {
-					beat = Math.sin((elapsed / 260.0D) * Math.PI) * 0.9D;
-				} else if (elapsed >= 760L && elapsed < 1020L) {
-					beat = Math.sin(((elapsed - 760L) / 260.0D) * Math.PI) * 1.1D;
+				// Collapse eye height onto the ground (0..0.45s), stay down through 6.0s, then rise back by 6.6s!
+				double collapseAmt;
+				if (elapsed < 450L) {
+					collapseAmt = 1.0D - Math.pow(1.0D - (elapsed / 450.0D), 3.0D);
+				} else if (elapsed < shatterMs) {
+					collapseAmt = 1.0D;
+				} else {
+					double riseT = (elapsed - shatterMs) / (double) Math.max(1L, rewindStartMs - shatterMs);
+					collapseAmt = 1.0D - easeInOutSine(riseT);
 				}
-				applySmoothPlayerCamera(player, first.x, first.y, first.z,
-						first.yaw + (float) (beat * 0.6F),
-						MathHelper.clamp(first.pitch + (float) (beat * 1.4F), -90.0F, 90.0F));
+
+				double beat = Math.sin(elapsed * 0.008D) * 0.45D * collapseAmt;
+				double droppedY = first.y - (0.72D * collapseAmt);
+				float fallenPitch = MathHelper.clamp(first.pitch + (float) (14.0D * collapseAmt + beat), -90.0F, 90.0F);
+				applySmoothPlayerCamera(player, first.x, droppedY, first.z, first.yaw, fallenPitch);
 			}
 			return;
 		}
 
-		// Act 2 (1.5s - 4.5s): Buttery-smooth sub-tick reverse trajectory interpolation!
-		double rawP = (elapsed - act1Ms) / (double) Math.max(1L, act2Ms - act1Ms);
-		double easedP = -(Math.cos(Math.PI * Math.max(0.0D, Math.min(1.0D, rawP))) - 1.0D) / 2.0D;
+		// Act 2C (6.6s - 15.0s): 8.4s Ultra-Smooth Catmull-Rom Cubic Spline Reverse Flight!
+		double rawP = (elapsed - rewindStartMs) / (double) Math.max(1L, act2Ms - rewindStartMs);
+		double easedP = easeInOutSine(rawP);
 
-		RewindFrame f0 = frames.get(0);
-		RewindFrame f1 = frames.get(frames.size() - 1);
+		int segIdx = 0;
 		for (int i = 0; i < frames.size() - 1; i++) {
-			RewindFrame a = frames.get(i);
-			RewindFrame b = frames.get(i + 1);
-			if (easedP >= a.p && easedP <= b.p) {
-				f0 = a;
-				f1 = b;
+			if (easedP >= frames.get(i).p && easedP <= frames.get(i + 1).p) {
+				segIdx = i;
 				break;
 			}
+			if (easedP > frames.get(i + 1).p) {
+				segIdx = i;
+			}
 		}
 
-		if (!f0.dim.equals(currentDim) || !f1.dim.equals(currentDim)) {
+		RewindFrame p1 = frames.get(segIdx);
+		RewindFrame p2 = frames.get(Math.min(frames.size() - 1, segIdx + 1));
+		if (!p1.dim.equals(currentDim) || !p2.dim.equals(currentDim)) {
 			return;
 		}
 
-		double span = Math.max(0.00001D, f1.p - f0.p);
-		float localT = (float) Math.max(0.0D, Math.min(1.0D, (easedP - f0.p) / span));
+		RewindFrame p0 = frames.get(Math.max(0, segIdx - 1));
+		RewindFrame p3 = frames.get(Math.min(frames.size() - 1, segIdx + 2));
+		if (!p0.dim.equals(currentDim)) p0 = p1;
+		if (!p3.dim.equals(currentDim)) p3 = p2;
 
-		double ix = MathHelper.lerp(localT, f0.x, f1.x);
-		double iy = MathHelper.lerp(localT, f0.y, f1.y);
-		double iz = MathHelper.lerp(localT, f0.z, f1.z);
-		float iyaw = MathHelper.lerpAngleDegrees(localT, f0.yaw, f1.yaw);
-		float ipitch = MathHelper.lerp(localT, f0.pitch, f1.pitch);
+		double span = Math.max(0.00001D, p2.p - p1.p);
+		float t = (float) Math.max(0.0D, Math.min(1.0D, (easedP - p1.p) / span));
+
+		double ix = catmullRom(t, p0.x, p1.x, p2.x, p3.x);
+		double iy = catmullRom(t, p0.y, p1.y, p2.y, p3.y);
+		double iz = catmullRom(t, p0.z, p1.z, p2.z, p3.z);
+		float iyaw = MathHelper.lerpAngleDegrees(t, p1.yaw, p2.yaw);
+		float ipitch = MathHelper.lerp(t, p1.pitch, p2.pitch);
 
 		applySmoothPlayerCamera(player, ix, iy, iz, iyaw, ipitch);
 
-		long isky = Math.round(f0.skyTime + (f1.skyTime - f0.skyTime) * localT);
+		long isky = Math.round(p1.skyTime + (p2.skyTime - p1.skyTime) * t);
 		if (isky >= 0L && "minecraft:overworld".equals(currentDim)) {
 			mc.world.setTimeOfDay(isky);
 		}
+	}
+
+	private static double catmullRom(float t, double p0, double p1, double p2, double p3) {
+		double t2 = t * t;
+		double t3 = t2 * t;
+		return 0.5D * ((2.0D * p1)
+				+ (-p0 + p2) * t
+				+ (2.0D * p0 - 5.0D * p1 + 4.0D * p2 - p3) * t2
+				+ (-p0 + 3.0D * p1 - 3.0D * p2 + p3) * t3);
 	}
 
 	private static void applySmoothPlayerCamera(ClientPlayerEntity player, double x, double y, double z, float yaw, float pitch) {
@@ -332,7 +468,152 @@ public final class ReturnByDeathClientController {
 	}
 
 	/**
-	 * Babak 3 (4.5s - 5.0s): Snap Back to Reality HUD Awakening Overlay (after ReturnByDeathScreen closes!)
+	 * Renders a True Circular Luminance-Grayscale World Lens of radius `radiusPx` centered on `(cx, cy)`.
+	 * Samples the live rendered 3D world from `mainFbo` so everything inside the circle appears in crisp
+	 * monochrome gray while everything outside the circle stays in natural full color!
+	 */
+	public static void renderGrayscaleWorldCircle(DrawContext ctx, int sw, int sh, float radiusFraction) {
+		if (radiusFraction <= 0.002F || sw <= 0 || sh <= 0) {
+			return;
+		}
+		ctx.draw();
+
+		MinecraftClient mc = MinecraftClient.getInstance();
+		Framebuffer mainFbo = mc.getFramebuffer();
+		float cx = sw * 0.5F;
+		float cy = sh * 0.5F;
+		float halfDiag = (float) Math.hypot(cx, cy);
+		float coreRadius = halfDiag * radiusFraction;
+		float featherW = Math.min(28.0F, Math.max(8.0F, coreRadius * 0.08F));
+
+		boolean canUseShader = (chronoGrayscaleShader != null && mainFbo != null && mainFbo.textureWidth > 0 && mainFbo.textureHeight > 0);
+		if (canUseShader) {
+			int fbW = mainFbo.textureWidth;
+			int fbH = mainFbo.textureHeight;
+			if (snapshotFbo == null) {
+				snapshotFbo = new SimpleFramebuffer(fbW, fbH, false, MinecraftClient.IS_SYSTEM_MAC);
+			} else if (snapshotFbo.textureWidth != fbW || snapshotFbo.textureHeight != fbH) {
+				snapshotFbo.resize(fbW, fbH, MinecraftClient.IS_SYSTEM_MAC);
+			}
+
+			// Copy live 3D world color buffer into snapshotFbo, then restore mainFbo as active draw target
+			GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, mainFbo.fbo);
+			GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, snapshotFbo.fbo);
+			GL30.glBlitFramebuffer(0, 0, fbW, fbH, 0, 0, fbW, fbH, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
+			mainFbo.beginWrite(false);
+
+			RenderSystem.enableBlend();
+			RenderSystem.defaultBlendFunc();
+			RenderSystem.disableCull();
+			RenderSystem.disableDepthTest();
+			RenderSystem.setShader(ReturnByDeathClientController::getChronoGrayscaleShader);
+			RenderSystem.setShaderTexture(0, snapshotFbo.getColorAttachment());
+			RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+			Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+			int segs = 72;
+			float innerSolidR = Math.max(0.0F, coreRadius - featherW * 0.5F);
+			float outerEdgeR = coreRadius + featherW * 0.5F;
+
+			// 1. Solid inner monochrome disk
+			if (innerSolidR > 0.5F) {
+				BufferBuilder fan = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_TEXTURE_COLOR);
+				fan.vertex(mat, cx, cy, 0.0F).texture(cx / sw, 1.0F - (cy / sh)).color(255, 255, 255, 255);
+				for (int i = 0; i <= segs; i++) {
+					double a = (i * Math.PI * 2.0D) / segs;
+					float px = cx + (float) Math.cos(a) * innerSolidR;
+					float py = cy + (float) Math.sin(a) * innerSolidR;
+					fan.vertex(mat, px, py, 0.0F).texture(px / sw, 1.0F - (py / sh)).color(255, 255, 255, 255);
+				}
+				BuiltBuffer built = fan.endNullable();
+				if (built != null) {
+					BufferRenderer.drawWithGlobalProgram(built);
+				}
+			}
+
+			// 2. Soft feathered outer ring so the expanding/shrinking gray boundary glides like silk!
+			if (radiusFraction < 1.03F) {
+				BufferBuilder skirt = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_TEXTURE_COLOR);
+				for (int i = 0; i <= segs; i++) {
+					double a = (i * Math.PI * 2.0D) / segs;
+					float cos = (float) Math.cos(a);
+					float sin = (float) Math.sin(a);
+					float ix = cx + cos * innerSolidR;
+					float iy = cy + sin * innerSolidR;
+					float ox = cx + cos * outerEdgeR;
+					float oy = cy + sin * outerEdgeR;
+					skirt.vertex(mat, ix, iy, 0.0F).texture(ix / sw, 1.0F - (iy / sh)).color(255, 255, 255, 255);
+					skirt.vertex(mat, ox, oy, 0.0F).texture(ox / sw, 1.0F - (oy / sh)).color(255, 255, 255, 0);
+				}
+				BuiltBuffer builtSkirt = skirt.endNullable();
+				if (builtSkirt != null) {
+					BufferRenderer.drawWithGlobalProgram(builtSkirt);
+				}
+			}
+		} else {
+			// Fallback translucent ash-gray circle if custom core shader wasn't initialized
+			RenderSystem.enableBlend();
+			RenderSystem.defaultBlendFunc();
+			RenderSystem.disableCull();
+			RenderSystem.disableDepthTest();
+			RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+			Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+			BufferBuilder fan = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
+			fan.vertex(mat, cx, cy, 0.0F).color(0xB87A7E87);
+			int segs = 64;
+			for (int i = 0; i <= segs; i++) {
+				double a = (i * Math.PI * 2.0D) / segs;
+				fan.vertex(mat, cx + (float) Math.cos(a) * coreRadius, cy + (float) Math.sin(a) * coreRadius, 0.0F).color(0xB87A7E87);
+			}
+			BuiltBuffer built = fan.endNullable();
+			if (built != null) {
+				BufferRenderer.drawWithGlobalProgram(built);
+			}
+		}
+
+		// 3. Luminous Silver-White Boundary Iris Ring whenever the circle edge is visible inside the screen!
+		if (radiusFraction > 0.01F && radiusFraction < 1.02F) {
+			RenderSystem.enableBlend();
+			RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
+			RenderSystem.disableCull();
+			RenderSystem.disableDepthTest();
+			RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+
+			Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+			int segs = 72;
+			float rIn = Math.max(0.0F, coreRadius - 4.0F);
+			float rOut = coreRadius + 4.0F;
+			BufferBuilder rim = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
+			for (int i = 0; i <= segs; i++) {
+				double a = (i * Math.PI * 2.0D) / segs;
+				float cos = (float) Math.cos(a);
+				float sin = (float) Math.sin(a);
+				rim.vertex(mat, cx + cos * rIn, cy + sin * rIn, 0.0F).color(0x00DCE4F5);
+				rim.vertex(mat, cx + cos * coreRadius, cy + sin * coreRadius, 0.0F).color(0xCCDCE4F5);
+			}
+			BuiltBuffer b1 = rim.endNullable();
+			if (b1 != null) BufferRenderer.drawWithGlobalProgram(b1);
+
+			BufferBuilder rimOut = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
+			for (int i = 0; i <= segs; i++) {
+				double a = (i * Math.PI * 2.0D) / segs;
+				float cos = (float) Math.cos(a);
+				float sin = (float) Math.sin(a);
+				rimOut.vertex(mat, cx + cos * coreRadius, cy + sin * coreRadius, 0.0F).color(0xCCDCE4F5);
+				rimOut.vertex(mat, cx + cos * rOut, cy + sin * rOut, 0.0F).color(0x00DCE4F5);
+			}
+			BuiltBuffer b2 = rimOut.endNullable();
+			if (b2 != null) BufferRenderer.drawWithGlobalProgram(b2);
+		}
+
+		RenderSystem.enableDepthTest();
+		RenderSystem.enableCull();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+	}
+
+	/**
+	 * Babak 3 (15.0s - 17.5s): Shrinking Grayscale Sphere & Return of World Color HUD Overlay!
 	 */
 	public static void renderAct3HudOverlay(DrawContext ctx, RenderTickCounter tickCounter) {
 		if (!active) {
@@ -347,56 +628,66 @@ public final class ReturnByDeathClientController {
 		int sw = mc.getWindow().getScaledWidth();
 		int sh = mc.getWindow().getScaledHeight();
 
-		double p = (elapsed - act2Ms) / (double) Math.max(1L, durationMs - act2Ms); // 0.0 .. 1.0 over 0.5s
-		double fade = Math.pow(1.0D - Math.min(1.0D, p), 1.85D);
+		// 1. Shrinking Monochrome Grayscale Sphere (1.08 -> 0.0 over 15.0s .. 17.5s)
+		float grayFrac = getGrayscaleRadiusFraction(elapsed);
+		renderGrayscaleWorldCircle(ctx, sw, sh, grayFrac);
 
-		// 1. Soft Abyssal Chrono Vignette fading out
-		int vigAlpha = (int) Math.round(165 * fade);
+		double p = (elapsed - act2Ms) / (double) Math.max(1L, durationMs - act2Ms); // 0.0 .. 1.0 over 2.5s
+		double vigFade = Math.pow(1.0D - Math.min(1.0D, p), 1.6D);
+
+		// 2. Soft Cinema Letterbox Vignette lifting away as color returns
+		int vigAlpha = (int) Math.round(145 * vigFade);
 		if (vigAlpha > 0) {
-			ctx.fillGradient(0, 0, sw, 46, (vigAlpha << 24) | 0x160524, 0x00160524);
-			ctx.fillGradient(0, sh - 46, sw, sh, 0x00160524, (vigAlpha << 24) | 0x160524);
+			ctx.fillGradient(0, 0, sw, 40, (vigAlpha << 24) | 0x101218, 0x00101218);
+			ctx.fillGradient(0, sh - 40, sw, sh, 0x00101218, (vigAlpha << 24) | 0x101218);
 		}
 
-		// 2. Smooth Radial Chrono Singularity Awakening Bloom
-		ctx.draw();
-		RenderSystem.enableBlend();
-		RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
-		RenderSystem.disableCull();
-		RenderSystem.disableDepthTest();
-		RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-
-		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
-		float cx = sw * 0.5F;
-		float cy = sh * 0.5F;
-		float maxRadius = Math.max(sw, sh) * 0.78F;
-		int flashAlpha = Math.max(0, Math.min(245, (int) Math.round(235 * Math.pow(1.0D - p, 2.2D))));
-		if (flashAlpha > 2) {
-			BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
-			buf.vertex(mat, cx, cy, 0.0F).color((flashAlpha << 24) | 0xF5E6FF);
-			int segs = 40;
-			int edgeCol = ((flashAlpha / 3) << 24) | 0x9B4DFF;
-			for (int i = 0; i <= segs; i++) {
-				double ang = (i * Math.PI * 2.0D) / segs;
-				buf.vertex(mat, cx + (float) (Math.cos(ang) * maxRadius), cy + (float) (Math.sin(ang) * maxRadius), 0.0F).color(edgeCol);
-			}
-			BuiltBuffer built = buf.endNullable();
-			if (built != null) {
-				BufferRenderer.drawWithGlobalProgram(built);
+		// 3. Final Singularity Sparkle at center right as the shrinking gray circle vanishes (p = 0.82 .. 1.0)
+		if (p > 0.80D) {
+			double endT = (p - 0.80D) / 0.20D;
+			int sparkAlpha = (int) Math.round(190 * Math.sin(endT * Math.PI));
+			if (sparkAlpha > 4) {
+				ctx.draw();
+				RenderSystem.enableBlend();
+				RenderSystem.blendFunc(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE);
+				RenderSystem.disableCull();
+				RenderSystem.disableDepthTest();
+				RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+				Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+				float cx = sw * 0.5F, cy = sh * 0.5F;
+				float r = (float) (28.0D * (1.0D - endT * 0.5D));
+				BufferBuilder buf = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_FAN, VertexFormats.POSITION_COLOR);
+				buf.vertex(mat, cx, cy, 0.0F).color((sparkAlpha << 24) | 0xFFF8E8);
+				for (int i = 0; i <= 32; i++) {
+					double a = (i * Math.PI * 2.0D) / 32.0D;
+					buf.vertex(mat, cx + (float) Math.cos(a) * r, cy + (float) Math.sin(a) * r, 0.0F).color(0x00FFF8E8);
+				}
+				BuiltBuffer built = buf.endNullable();
+				if (built != null) BufferRenderer.drawWithGlobalProgram(built);
+				RenderSystem.enableDepthTest();
+				RenderSystem.enableCull();
+				RenderSystem.defaultBlendFunc();
+				RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 			}
 		}
 
-		RenderSystem.enableDepthTest();
-		RenderSystem.enableCull();
-		RenderSystem.defaultBlendFunc();
-		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-
-		// 3. Crisp Awakening Banner
+		// 4. Crisp Awakening Banner
 		int textAlpha = Math.max(0, Math.min(255, (int) Math.round(255 * Math.sin(Math.min(1.0D, p) * Math.PI))));
 		if (textAlpha > 18 && mc.textRenderer != null) {
 			String title = String.format(Locale.ROOT, "✦ RETURNED BY DEATH -%.1fs ✦", rewoundSeconds);
 			int tw = mc.textRenderer.getWidth(title);
-			ctx.drawTextWithShadow(mc.textRenderer, title, (sw - tw) / 2, sh / 2 - 36, (textAlpha << 24) | (CrimsonTheme.GOLD & 0x00FFFFFF));
+			ctx.drawTextWithShadow(mc.textRenderer, title, (sw - tw) / 2, sh - 52, (textAlpha << 24) | (CrimsonTheme.GOLD & 0x00FFFFFF));
 		}
+	}
+
+	public static double easeInOutSine(double t) {
+		double c = Math.max(0.0D, Math.min(1.0D, t));
+		return -(Math.cos(Math.PI * c) - 1.0D) / 2.0D;
+	}
+
+	public static double easeInOutCubic(double t) {
+		double c = Math.max(0.0D, Math.min(1.0D, t));
+		return c < 0.5D ? 4.0D * c * c * c : 1.0D - Math.pow(-2.0D * c + 2.0D, 3.0D) / 2.0D;
 	}
 
 	public static void playVanillaSound(String vanillaPath, float pitch) {

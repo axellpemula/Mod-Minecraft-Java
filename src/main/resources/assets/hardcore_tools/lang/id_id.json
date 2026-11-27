@@ -15,7 +15,7 @@
   "hc.slot.offhand": "Tangan Kiri",
   "hc.slot.hotbar": "Hotbar %s",
   "hc.slot.bag": "Tas %s",
-  "hc.main.title": "Hardcore Tools",
+  "hc.main.title": "Void Sovereign",
   "hc.main.short.immortal": "Abadi",
   "hc.main.short.totem": "Totem",
   "hc.main.short.vein": "Tambang",
@@ -329,10 +329,10 @@
   "hc.ench.tier.vanilla": "Vanilla Maks",
   "hc.ench.tier.over25": "Over-Enchant (Lv. 25)",
   "hc.ench.slider.level": "Level Enchant (1–25)",
-  "category.hardcore_tools": "Hardcore Tools",
-  "key.hardcore_tools.open_menu": "Buka Dashboard Hardcore Tools",
+  "category.hardcore_tools": "Void Sovereign",
+  "key.hardcore_tools.open_menu": "Buka Dashboard Void Sovereign",
   "hc.java.subtitle": "Fabric 1.21.1 · Crimson Suite",
-  "hc.java.hint.join": "§c§l[Hardcore Tools] §r§7Tekan §e[%s] §7atau ketik §e/hc §7untuk membuka Crimson Dashboard.",
+  "hc.java.hint.join": "§5§l[Void Sovereign] §r§7Tekan §e[%s] §7atau ketik §e/vs §7(§e/hc§7) untuk membuka Dashboard.",
   "hc.java.tab.protection": "Proteksi",
   "hc.java.tab.vein": "Vein & Pohon",
   "hc.java.tab.sneak": "Sneak Grow",
@@ -352,6 +352,7 @@
   "hc.java.no_item": "Pegang senjata, alat, atau armor di tangan utama",
   "hc.java.tab.upgrader": "Item Upgrader",
   "hc.java.tab.uncraft": "Uncraft",
+  "hc.java.tab.info": "Info",
   "key.hardcore_tools.toggle_fullbright": "Aktifkan / Matikan Fullbright",
-  "key.hardcore_tools.radial_wheel": "Menu Roda Cepat / Radial Wheel (Tahan)"
+  "key.hardcore_tools.radial_wheel": "Buka Menu Roda Cepat / Radial Wheel"
 }

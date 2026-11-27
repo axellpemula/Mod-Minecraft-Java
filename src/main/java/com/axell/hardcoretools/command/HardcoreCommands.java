@@ -24,22 +24,20 @@ public final class HardcoreCommands {
 
 	public static void register() {
 		CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-			// /hc, /hc config, /hc back, /hc gm <mode>, /hc gamemode <mode>
-			// (permission level 0 — works in Hardcore & Survival without Cheats!)
-			LiteralArgumentBuilder<ServerCommandSource> hcRoot = CommandManager.literal("hc")
-					.executes(HardcoreCommands::openDashboard)
-					.then(CommandManager.literal("config").executes(HardcoreCommands::openDashboard))
-					.then(CommandManager.literal("back").executes(HardcoreCommands::warpBack))
-					.then(buildGameModeBranch("gamemode"))
-					.then(buildGameModeBranch("gm"));
+			// /vs & /hc (permission level 0 — works in Hardcore & Survival without Cheats!)
+			for (String rootName : new String[]{"vs", "hc"}) {
+				LiteralArgumentBuilder<ServerCommandSource> root = CommandManager.literal(rootName)
+						.executes(HardcoreCommands::openDashboard)
+						.then(CommandManager.literal("config").executes(HardcoreCommands::openDashboard))
+						.then(CommandManager.literal("back").executes(HardcoreCommands::warpBack))
+						.then(buildGameModeBranch("gamemode"))
+						.then(buildGameModeBranch("gm"));
+				dispatcher.register(root);
+			}
 
-			dispatcher.register(hcRoot);
-
-			// /hc:config parity alias with Bedrock Edition
-			dispatcher.register(
-					CommandManager.literal("hc:config")
-							.executes(HardcoreCommands::openDashboard)
-			);
+			// /vs:config & /hc:config parity aliases
+			dispatcher.register(CommandManager.literal("vs:config").executes(HardcoreCommands::openDashboard));
+			dispatcher.register(CommandManager.literal("hc:config").executes(HardcoreCommands::openDashboard));
 
 			// Extend Vanilla's /gamemode with a native "hardcore" literal!
 			CommandNode<ServerCommandSource> vanillaGm = dispatcher.getRoot().getChild("gamemode");
@@ -69,7 +67,7 @@ public final class HardcoreCommands {
 			return 0;
 		}
 		if (!HardcoreStateManager.canUseTools(player)) {
-			ctx.getSource().sendError(Text.literal("You do not have permission to use Hardcore Tools on this server.").formatted(Formatting.RED));
+			ctx.getSource().sendError(Text.literal("You do not have permission to use Void Sovereign on this server.").formatted(Formatting.RED));
 			return 0;
 		}
 		String msg = ActionDispatcher.applyGameMode(player, mode);
@@ -84,11 +82,11 @@ public final class HardcoreCommands {
 	private static int openDashboard(CommandContext<ServerCommandSource> ctx) {
 		ServerPlayerEntity player = ctx.getSource().getPlayer();
 		if (player == null) {
-			ctx.getSource().sendError(Text.literal("Only players can open Hardcore Tools."));
+			ctx.getSource().sendError(Text.literal("Only players can open Void Sovereign."));
 			return 0;
 		}
 		if (!HardcoreStateManager.canUseTools(player)) {
-			ctx.getSource().sendError(Text.literal("You do not have permission to use Hardcore Tools on this server.").formatted(Formatting.RED));
+			ctx.getSource().sendError(Text.literal("You do not have permission to use Void Sovereign on this server.").formatted(Formatting.RED));
 			return 0;
 		}
 		HardcoreNetworking.sendOpenScreen(player);
@@ -98,11 +96,11 @@ public final class HardcoreCommands {
 	private static int warpBack(CommandContext<ServerCommandSource> ctx) {
 		ServerPlayerEntity player = ctx.getSource().getPlayer();
 		if (player == null) {
-			ctx.getSource().sendError(Text.literal("Only players can use /hc back."));
+			ctx.getSource().sendError(Text.literal("Only players can use /vs back."));
 			return 0;
 		}
 		if (!HardcoreStateManager.canUseTools(player)) {
-			ctx.getSource().sendError(Text.literal("You do not have permission to use Hardcore Tools on this server.").formatted(Formatting.RED));
+			ctx.getSource().sendError(Text.literal("You do not have permission to use Void Sovereign on this server.").formatted(Formatting.RED));
 			return 0;
 		}
 		WaypointEntry target = TeleportFeature.teleportBack(player);

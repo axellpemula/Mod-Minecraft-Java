@@ -549,6 +549,7 @@ public final class ActionDispatcher {
 							Box box = new Box(player.getBlockPos()).expand(256);
 							List<ItemEntity> drops = w.getEntitiesByClass(ItemEntity.class, box, Entity::isAlive);
 							for (ItemEntity item : drops) {
+								if (item.getCommandTags().contains(ReturnByDeathFeature.GHOST_DROP_TAG)) continue;
 								item.discard();
 								cleared++;
 							}
