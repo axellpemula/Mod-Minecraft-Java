@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "com.axell.hardcoretools.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [
+		"CreeperEntityMixin",
+		"LevelInfoAccessor",
+		"ServerPlayerInteractionManagerMixin",
+		"WorldMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

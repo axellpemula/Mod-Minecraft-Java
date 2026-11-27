@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "com.axell.hardcoretools.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"ClientWorldPropertiesAccessor",
+		"GameRendererMixin",
+		"LightmapTextureManagerMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

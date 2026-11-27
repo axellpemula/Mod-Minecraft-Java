@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "hardcore_tools",
+	"version": "${version}",
+	"name": "Hardcore Tools",
+	"description": "Hardcore Crimson Utility Suite — Return by Death, Immortal Mode, Auto-Totem, Vein Miner & Tree Capitator, Sneak Grow, Ore Plus+, Native Over-Enchant Lv. 25, Item Upgrader w/ Pity, Uncraft, Locator, Waypoints & Console.",
+	"authors": [
+		"xVoid Axell"
+	],
+	"contact": {
+		"homepage": "https://github.com/axellpemula/Hardcore-Tools",
+		"sources": "https://github.com/axellpemula/Hardcore-Tools"
+	},
+	"license": "MIT",
+	"icon": "assets/hardcore_tools/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.axell.hardcoretools.HardcoreToolsMod"
+		],
+		"client": [
+			"com.axell.hardcoretools.client.HardcoreToolsClient"
+		]
+	},
+	"mixins": [
+		"hardcore_tools.mixins.json",
+		{
+			"config": "hardcore_tools.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.15.11",
+		"minecraft": "~1.21.1",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}
