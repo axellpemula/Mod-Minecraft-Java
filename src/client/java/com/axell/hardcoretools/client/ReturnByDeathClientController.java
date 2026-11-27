@@ -79,6 +79,8 @@ public final class ReturnByDeathClientController {
 	private static int lastClockTickIdx = -1;
 	private static long lockShakeClickMs = 0L;
 	private static int lockedButtonIndex = -1;
+	private static float deathBaseYaw = 0.0F;
+	private static float deathBasePitch = 0.0F;
 
 	// Vanilla-style "soul leaving the body" death camera state
 	private static Perspective savedPerspective = null;
@@ -180,37 +182,20 @@ public final class ReturnByDeathClientController {
 	}
 
 	/**
-	 * Authentic-Vanilla "soul leaving the body" death camera.
+	 * Death camera roll = 0.0 during the corpse sequence.
 	 * <p>
-	 * Vanilla itself does NOT tilt the view sideways: on death it forces third-person and the
-	 * camera keeps the player's look angle, so you hover a few blocks behind/above your own body.
-	 * Because the player entity keeps that rotation, holding a straight look angle means the camera
-	 * looks down at the corpse from above — exactly the "zoom out & stare down at your whole body"
-	 * framing people remember.
-	 * <p>
-	 * Timeline:
-	 * - 0.00s .. 0.55s: camera pulls out and swings up above the body (smooth ease-out)
-	 * - 0.55s .. 6.00s: hovers above/behind the corpse while items scatter, tiny breathing drift
-	 * - 6.00s .. 7.20s: glides back down into the body while the world rewinds
-	 * - Rotation roll is only a tiny 3D "slump" wobble, never a sideways first-person tilt.
+	 * It used to feed a growing sine sway into GameRenderer#tiltViewWhenHurt, which is applied
+	 * every single frame on top of the already-rotated third-person camera. That double rotation
+	 * was what made the screen look like it was violently shaking. The framing is now done purely
+	 * through Camera#setRotation (see CameraMixin), so no extra roll is needed here.
 	 */
 	public static float getDeathCameraRollDegrees() {
-		if (!active) return 0.0F;
-		long elapsed = getElapsedMs();
-		if (elapsed >= shatterMs + 1200L) {
-			return 0.0F;
-		}
-		// Gentle astral sway only — vanilla stays upright, so keep this subtle (max ~3.5°)
-		double sway = Math.sin(elapsed * 0.0016D) * 3.5D;
-		double fade;
-		if (elapsed < 600L) {
-			fade = elapsed / 600.0D;
-		} else if (elapsed < shatterMs) {
-			fade = 1.0D;
-		} else {
-			fade = Math.max(0.0D, 1.0D - (elapsed - shatterMs) / 1200.0D);
-		}
-		return (float) (sway * fade);
+		return 0.0F;
+	}
+
+	/** True while the player should be lying on the floor like a real corpse. */
+	public static boolean shouldPoseAsCorpse(long elapsed) {
+		return elapsed >= 0L && elapsed < shatterMs;
 	}
 
 	/** 0.0 -> 1.0: how far the death camera has swung out & above the corpse. */
@@ -311,6 +296,13 @@ public final class ReturnByDeathClientController {
 			playVanillaSound("entity.elder_guardian.curse", 0.52F);
 
 			MinecraftClient mc = MinecraftClient.getInstance();
+			if (mc.player != null) {
+				deathBaseYaw = mc.player.getYaw();
+				deathBasePitch = mc.player.getPitch();
+			} else if (!frames.isEmpty()) {
+				deathBaseYaw = frames.get(0).yaw;
+				deathBasePitch = frames.get(0).pitch;
+			}
 			ClientStateSnapshot.INSTANCE.upgraderModalOpen = false;
 			mc.setScreen(new ReturnByDeathScreen());
 		} catch (Exception ignored) {
@@ -455,15 +447,9 @@ public final class ReturnByDeathClientController {
 		String currentDim = mc.world.getRegistryKey().getValue().toString();
 
 		if (elapsed < rewindStartMs) {
-			RewindFrame first = frames.get(0);
-			if (first.dim.equals(currentDim)) {
-				// Act 1: camera floats out of the body and cranes DOWN over it — the classic vanilla
-				// "soul leaves the body, you look at your own corpse from above" framing.
-				double out = deathCameraOutAmount(elapsed);
-				float overheadPitch = MathHelper.clamp((float) (42.0D * out), -90.0F, 90.0F);
-				double breath = Math.sin(elapsed * 0.0016D) * 0.06D * out;
-				applySmoothPlayerCamera(player, first.x, first.y + breath, first.z, first.yaw, overheadPitch);
-			}
+			// Act 1: the player entity itself is already lying on the floor (server-side SWIMMING
+			// pose); the camera framing is handled once per frame by CameraMixin. Teleporting the
+			// player here every frame fought the camera interpolation and caused the shudder.
 			return;
 		}
 
@@ -531,6 +517,30 @@ public final class ReturnByDeathClientController {
 		} else if (perspectiveForced) {
 			restoreDeathCamera(mc);
 		}
+	}
+
+	/**
+	 * Pushes the vanilla-style death framing into Camera#setRotation once per frame:
+	 * a smooth orbit that rises behind the lying body and looks down at it, then relaxes
+	 * back to the normal look direction inside the same 6.6s window.
+	 */
+	public static void applyDeathCameraRotation(net.minecraft.client.render.Camera camera) {
+		if (!active || camera == null) {
+			return;
+		}
+		long elapsed = getElapsedMs();
+		if (elapsed >= rewindStartMs) {
+			return;
+		}
+		double out = deathCameraOutAmount(elapsed);
+		if (out <= 0.001D) {
+			return;
+		}
+
+		// Slow orbit around the body so it reads as a cinematic drift instead of a freeze.
+		float yaw = deathBaseYaw + (float) (34.0D * out);
+		float pitch = MathHelper.clamp(deathBasePitch + (float) (50.0D * out), -90.0F, 90.0F);
+		camera.setRotation(yaw, pitch);
 	}
 
 	private static void restoreDeathCamera(MinecraftClient mc) {

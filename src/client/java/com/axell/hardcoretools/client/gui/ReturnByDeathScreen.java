@@ -327,6 +327,11 @@ public class ReturnByDeathScreen extends Screen {
 
 		// Chain & padlock binding animation, ONLY on the button that was just clicked
 		if (lockP > 0.0F && lockedIdx >= 0 && lockedIdx < BUTTON_COUNT) {
+			// Faint dark plate behind the X so the chains read clearly on bright terrain
+			int plateA = (int) Math.round(110 * Math.min(1.0F, lockP * 2.0F));
+			int lx0 = bx + (lockedIdx == 0 ? shake0 : shake1);
+			int ly0 = lockedIdx == 0 ? b1y : b2y;
+			ctx.fill(lx0 - 4, ly0 - 6, lx0 + bw + 4, ly0 + bh + 6, (plateA << 24) | 0x0B0710);
 			int ly = lockedIdx == 0 ? b1y : b2y;
 			int lx = bx + (lockedIdx == 0 ? shake0 : shake1);
 			drawBindingChains(ctx, lx, ly, bw, bh, lockP);
@@ -374,63 +379,99 @@ public class ReturnByDeathScreen extends Screen {
 	 * Chains + padlock snapping around a button after it is clicked.
 	 * lockP fades 1.0 -> 0.0 over 1.4s, so the bindings uncoil & dissolve on their own.
 	 */
+	/**
+	 * Two chains snapping across the button in an X, chained together by a padlock in the middle.
+	 * lockP goes 1.0 -> 0.0 over 1.4s, so the bindings visibly lock on and then dissolve.
+	 */
 	private void drawBindingChains(DrawContext ctx, int x, int y, int w, int h, float lockP) {
-		float snap = Math.min(1.0F, (1.0F - lockP) * 3.2F);   // 0.0 = just snapped on
-		float alpha = Math.min(1.0F, lockP * 1.6F);           // fade out near the end
-		int a = (int) Math.round(235 * alpha);
-		if (a <= 4) {
+		float bind = 1.0F - lockP;                    // 0.0 = just clicked, 1.0 = fully dissolved
+		float draw = Math.min(1.0F, bind * 3.0F);      // chains fully drawn by ~0.47s
+		float alpha = lockP <= 0.28F ? lockP / 0.28F : 1.0F;
+		int a = (int) Math.round(240 * Math.max(0.0F, Math.min(1.0F, alpha)));
+		if (a <= 6 || draw <= 0.01F) {
 			return;
 		}
 
-		int chainDark = (a << 24) | 0x3F2A2F;
-		int chainHi = (a << 24) | 0xF87171;
-		int chainSteel = (a << 24) | 0xCBD5E1;
+		int steel = (a << 24) | 0xCBD5E1;
+		int steelDark = (a << 24) | 0x64748B;
+		int rust = (a << 24) | 0x9F1239;
+		int padlock = (a << 24) | 0xFBBF24;
 
-		// 1. Two iron bands wrapping around the button (top & bottom), anchored beyond the edges
-		int bandInset = (int) Math.round((1.0F - snap) * (w * 0.45F));
-		for (int band = 0; band < 2; band++) {
-			int by = band == 0 ? y - 2 : y + h;
-			int startX = x + bandInset;
-			int endX = x + w - bandInset;
-			if (endX - startX < 10) {
-				continue;
-			}
-			for (int i = startX; i < endX - 6; i += 12) {
-				int segEnd = Math.min(endX, i + 9);
-				ctx.fill(i, by, segEnd, by + 4, chainDark);
-				ctx.fill(i + 1, by + 1, segEnd - 1, by + 2, chainHi);
-			}
+		// Chain A: top-left -> bottom-right. Chain B: bottom-left -> top-right.
+		float x1 = x - 2.0F, x2 = x + w + 2.0F;
+		float[] yA1 = { y - 3.0F, y + h + 3.0F };
+		float[] yA2 = { y + h + 3.0F, y - 3.0F };
+		drawDiagonalChain(ctx, x1, yA1[0], x2, yA1[1], draw, steel, steelDark, rust);
+		drawDiagonalChain(ctx, x1, yA2[0], x2, yA2[1], draw, steel, steelDark, rust);
+
+		// Glowing impact spark where the two chains cross while they snap closed
+		float sparkAlpha = Math.max(0.0F, 1.0F - bind * 4.0F);
+		if (sparkAlpha > 0.02F) {
+			int cx = x + w / 2;
+			int cy = y + h / 2;
+			int sa = (int) Math.round(220 * sparkAlpha);
+			ctx.fill(cx - 10, cy - 1, cx + 10, cy + 1, (sa << 24) | 0xFEF3C7);
+			ctx.fill(cx - 1, cy - 10, cx + 1, cy + 10, (sa << 24) | 0xFEF3C7);
 		}
 
-		// 2. Diagonal chain crossing the face of the button, drawn link by link
-		int links = 10;
-		int visible = Math.max(0, (int) Math.round(links * snap * 3.0F));
-		for (int i = 0; i < Math.min(links, visible); i++) {
-			int px = x + 8 + (int) ((w - 24) * (i / (float) Math.max(1, links - 1)));
-			int py = y + 4 + (i % 2 == 0 ? 0 : 2);
-			ctx.fill(px, py, px + 9, py + 3, chainDark);
-			ctx.fill(px + 1, py, px + 8, py + 1, chainSteel);
-			// Alternate diagonal offset to read as interlocking rings
-			if (i % 2 == 0) {
-				ctx.fill(px + 3, py + 3, px + 6, py + 5, chainHi);
+		// Padlock clamping shut exactly on the X crossing
+		float lockScale = Math.min(1.0F, bind * 3.5F);
+		if (lockScale > 0.05F) {
+			drawCenterPadlock(ctx, x + w / 2, y + h / 2, lockScale, padlock, a);
+		}
+	}
+
+	/** Draws one chain as a run of alternating links that grows from left to right. */
+	private void drawDiagonalChain(DrawContext ctx, float sx, float sy, float ex, float ey,
+								   float progress, int linkColor, int linkDark, int linkRust) {
+		int links = 16;
+		int visible = Math.max(1, (int) Math.round(links * progress));
+		float dx = (ex - sx) / links;
+		float dy = (ey - sy) / links;
+		for (int i = 0; i < visible; i++) {
+			float px = sx + dx * i + 3.0F;
+			float py = sy + dy * i + 1.0F;
+			int ix = (int) px;
+			int iy = (int) py;
+			boolean wide = i % 2 == 0;
+			int col = i % 5 == 0 ? linkRust : linkColor;
+			if (wide) {
+				ctx.fill(ix, iy, ix + 8, iy + 3, linkDark);
+				ctx.fill(ix + 1, iy + 1, ix + 7, iy + 2, col);
+			} else {
+				ctx.fill(ix + 2, iy - 1, ix + 5, iy + 5, linkDark);
+				ctx.fill(ix + 3, iy, ix + 4, iy + 4, col);
 			}
 		}
+	}
 
-		// 3. Padlock clamping shut in the middle of the button
-		int lx = x + w / 2 - 6;
-		int ly = y + h / 2 - 7;
-		int lockAlpha = (int) Math.round(255 * Math.max(0.0F, Math.min(1.0F, snap * 2.0F)));
-		int gold = (lockAlpha << 24) | 0xFBBF24;
-		int goldDark = (lockAlpha << 24) | 0xB45309;
-		// shackle
-		ctx.fill(lx + 1, ly, lx + 11, ly + 2, gold);
-		ctx.fill(lx, ly + 1, lx + 2, ly + 5, gold);
-		ctx.fill(lx + 10, ly + 1, lx + 12, ly + 5, gold);
-		// body
-		ctx.fill(lx - 1, ly + 5, lx + 13, ly + 14, gold);
-		ctx.fill(lx - 1, ly + 5, lx + 13, ly + 6, goldDark);
-		// keyhole
-		ctx.fill(lx + 5, ly + 8, lx + 7, ly + 12, 0xFF1A1016);
+	/** Gold padlock with shackle, drawn centred on (cx, cy). */
+	private void drawCenterPadlock(DrawContext ctx, int cx, int cy, float scale, int gold, int alpha) {
+		int bodyW = Math.max(6, (int) Math.round(16 * scale));
+		int bodyH = Math.max(5, (int) Math.round(12 * scale));
+		int bx = cx - bodyW / 2;
+		int by = cy - bodyH / 2 + 2;
+
+		int goldDark = (alpha << 24) | 0xB45309;
+		int keyhole = (alpha << 24) | 0x1A1016;
+
+		// Shackle (arch above the body)
+		int archW = Math.max(4, bodyW - 4);
+		int ax = cx - archW / 2;
+		int ay = by - (int) Math.round(7 * scale);
+		ctx.fill(ax, ay, ax + archW, ay + 2, goldDark);
+		ctx.fill(ax, ay + 2, ax + 2, by + 1, gold);
+		ctx.fill(ax + archW - 2, ay + 2, ax + archW, by + 1, gold);
+
+		// Body
+		ctx.fill(bx, by, bx + bodyW, by + bodyH, gold);
+		ctx.fill(bx, by, bx + bodyW, by + Math.max(1, bodyH / 4), goldDark);
+		ctx.drawBorder(bx, by, bodyW, bodyH, goldDark);
+
+		// Keyhole
+		int kx = cx - 1;
+		int ky = by + bodyH / 3;
+		ctx.fill(kx, ky, kx + 2, ky + Math.max(2, bodyH / 3), keyhole);
 	}
 
 	private void drawFullScreenGlassCracks(DrawContext ctx, float crackP) {

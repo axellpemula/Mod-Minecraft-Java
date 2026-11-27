@@ -71,6 +71,7 @@ public final class ReturnByDeathFeature {
 	private static final int MAX_BLOCK_JOURNAL = 24000;
 	private static final int MAX_ENTITY_DEATHS = 160;
 	private static final double BLOCK_TRACK_RADIUS_SQ = 88.0D * 88.0D;
+	private static final double REWIND_TRACK_RADIUS_SQ = 160.0D * 160.0D;
 	private static final double ENTITY_TRACK_RADIUS = 56.0D;
 
 	private static boolean restoringWorld = false;
@@ -168,6 +169,7 @@ public final class ReturnByDeathFeature {
 		final double deathX;
 		final double deathY;
 		final double deathZ;
+		final float deathPitch;
 		final StateCheckpoint targetCheckpoint;
 		final List<TrajectorySample> reversePath; // Ordered from deathTick (index 0) back to targetTick (last)
 		final List<GhostScatteredDrop> ghostDrops;
@@ -177,7 +179,7 @@ public final class ReturnByDeathFeature {
 
 		ActiveRewindSession(UUID playerUuid, long startServerTick, long deathTick, long targetTick,
 							double rewoundSeconds, RegistryKey<World> deathDimension,
-							double deathX, double deathY, double deathZ,
+							double deathX, double deathY, double deathZ, float deathPitch,
 							StateCheckpoint targetCheckpoint, List<TrajectorySample> reversePath,
 							List<GhostScatteredDrop> ghostDrops,
 							long skyTimeAtDeath, long skyTimeAtTarget) {
@@ -190,6 +192,7 @@ public final class ReturnByDeathFeature {
 			this.deathX = deathX;
 			this.deathY = deathY;
 			this.deathZ = deathZ;
+			this.deathPitch = deathPitch;
 			this.targetCheckpoint = targetCheckpoint;
 			this.reversePath = reversePath;
 			this.ghostDrops = ghostDrops;
@@ -228,6 +231,7 @@ public final class ReturnByDeathFeature {
 		ActiveRewindSession session = ACTIVE_REWINDS.remove(player.getUuid());
 		if (session != null) {
 			discardGhostDrops(server, session);
+			player.setNoGravity(false);
 			if (!session.restoredFinalState) {
 				session.restoredFinalState = true;
 				player.setPose(EntityPose.STANDING);
@@ -280,7 +284,7 @@ public final class ReturnByDeathFeature {
 			return;
 		}
 		MinecraftServer server = world.getServer();
-		if (server == null || (!ACTIVE_REWINDS.isEmpty() && isAnyRewindInDimension(world.getRegistryKey()))) {
+		if (server == null) {
 			return;
 		}
 		if (!hasActiveRbdObserverNear(world, pos)) {
@@ -312,6 +316,56 @@ public final class ReturnByDeathFeature {
 				oldState,
 				oldBeNbt
 		));
+	}
+
+	/**
+	 * Called from the Explosion mixin BEFORE any block is destroyed.
+	 * <p>
+	 * recordBlockChange() only hooks World#setBlockState, which vanilla explosions never go
+	 * through (Explosion uses its own internal chunk-level write), so creeper/TNT/bed/wither
+	 * craters were silently missing from the journal and therefore never restored on rewind.
+	 * Here we snapshot every block in Explosion#getAffectedBlocks() while it still exists.
+	 */
+	public static void recordExplosionBlocks(World world, List<BlockPos> positions) {
+		if (restoringWorld || !(world instanceof ServerWorld serverWorld) || positions == null || positions.isEmpty()) {
+			return;
+		}
+		MinecraftServer server = serverWorld.getServer();
+		if (server == null) {
+			return;
+		}
+		long tick = server.getTicks();
+		for (BlockPos rawPos : positions) {
+			if (rawPos == null) continue;
+			BlockPos pos = rawPos.toImmutable();
+			BlockState oldState = serverWorld.getBlockState(pos);
+			if (oldState.isAir()) {
+				continue;
+			}
+			if (!hasActiveRbdObserverNear(serverWorld, pos)) {
+				continue;
+			}
+			NbtCompound oldBeNbt = null;
+			if (oldState.hasBlockEntity()) {
+				BlockEntity be = serverWorld.getBlockEntity(pos);
+				if (be != null) {
+					try {
+						oldBeNbt = be.createNbtWithIdentifyingData(serverWorld.getRegistryManager());
+					} catch (Exception ignored) {
+					}
+				}
+			}
+			if (BLOCK_JOURNAL.size() >= MAX_BLOCK_JOURNAL) {
+				BLOCK_JOURNAL.pollFirst();
+			}
+			BLOCK_JOURNAL.addLast(new BlockUndoEntry(
+					tick,
+					serverWorld.getRegistryKey(),
+					pos,
+					oldState,
+					oldBeNbt
+			));
+		}
 	}
 
 	public static void recordCreeperPreExplosion(CreeperEntity creeper) {
@@ -473,13 +527,17 @@ public final class ReturnByDeathFeature {
 
 		// Collapse body prone onto ground with white death-poof cloud & death sound (while keeping 1.0F HP so Hardcore never locks!)
 		player.setHealth(1.0F);
+		player.setPos(deathX, deathY, deathZ);
+		// Fall flat on the floor like a real corpse, staring roughly level with the ground.
 		player.setPose(EntityPose.SWIMMING);
+		player.setPitch(Math.max(-18.0F, Math.min(18.0F, player.getPitch())));
+		player.setNoGravity(true);
 		player.hurtTime = 10;
 		player.maxHurtTime = 10;
 		player.setVelocity(0.0D, 0.0D, 0.0D);
 		player.velocityModified = true;
-		player.setFireTicks(0);
 		player.fallDistance = 0.0F;
+		player.setFireTicks(0);
 
 		deathWorld.spawnParticles(ParticleTypes.POOF, deathX, deathY + 0.5D, deathZ, 28, 0.45D, 0.25D, 0.45D, 0.04D);
 		deathWorld.playSound(null, deathX, deathY, deathZ, SoundEvents.ENTITY_PLAYER_DEATH, SoundCategory.PLAYERS, 1.0F, 0.92F);
@@ -494,6 +552,7 @@ public final class ReturnByDeathFeature {
 				deathX,
 				deathY,
 				deathZ,
+				player.getPitch(),
 				chosenCheckpoint,
 				reversePath,
 				ghostDrops,
@@ -769,6 +828,18 @@ public final class ReturnByDeathFeature {
 				player.setPose(EntityPose.SWIMMING);
 				player.setVelocity(0.0D, 0.0D, 0.0D);
 				player.velocityModified = true;
+				player.setNoGravity(true);
+				player.fallDistance = 0.0F;
+				// Body stays exactly where it fell: no gravity drift, no sliding off ledges.
+				if (session.deathDimension.equals(player.getServerWorld().getRegistryKey())) {
+					player.setPosition(session.deathX, session.deathY, session.deathZ);
+				}
+				// Re-assert the fallen pose every tick: living-entity ticking keeps trying to
+				// pop the player back upright, which is what made the body look like it was
+				// just standing there shivering.
+				player.setPose(EntityPose.SWIMMING);
+				player.setPitch(Math.max(-18.0F, Math.min(18.0F, session.deathPitch)));
+				player.hurtTime = 10;
 				freezeNearbyHostiles(player, 36.0D);
 			} else if (elapsed < ACT1_TICKS + ACT2_TICKS) {
 				// ==================== BABAK 2 (4.5s - 15.0s): SHATTER -> GRAYSCALE -> 8.4s SMOOTH REWIND ====================
@@ -780,6 +851,7 @@ public final class ReturnByDeathFeature {
 					// 4.5s - 6.6s: Screen cracking -> shattering -> expanding grayscale dome while items levitate/pull!
 					if (elapsed >= ACT1_TICKS + 30) {
 						player.setPose(EntityPose.STANDING);
+						player.setNoGravity(false);
 					}
 					player.setVelocity(0.0D, 0.0D, 0.0D);
 					player.velocityModified = true;
@@ -788,6 +860,7 @@ public final class ReturnByDeathFeature {
 				}
 
 				player.setPose(EntityPose.STANDING);
+				player.setNoGravity(false);
 				double rawP = (elapsed - rewindStartTick) / (double) REWIND_FLIGHT_TICKS;
 				double easedP = easeInOutSine(rawP);
 				long span = Math.max(1L, session.deathTick - session.targetTick);
@@ -825,6 +898,7 @@ public final class ReturnByDeathFeature {
 					session.restoredFinalState = true;
 					discardGhostDrops(server, session);
 					player.setPose(EntityPose.STANDING);
+					player.setNoGravity(false);
 					rewindWorldSlice(server, player, session.targetTick);
 					restorePlayerFullCheckpoint(server, player, session.targetCheckpoint);
 
@@ -1214,18 +1288,26 @@ public final class ReturnByDeathFeature {
 
 	private static boolean hasActiveRbdObserverNear(ServerWorld world, BlockPos pos) {
 		for (ServerPlayerEntity player : world.getPlayers()) {
-			if (!player.isAlive() || ACTIVE_REWINDS.containsKey(player.getUuid())) continue;
 			PlayerProfile profile = HardcoreStateManager.getProfile(player);
-			if (profile.returnByDeath && player.squaredDistanceTo(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D) <= BLOCK_TRACK_RADIUS_SQ) {
-				return true;
-			}
-		}
-		return false;
-	}
+			if (!profile.returnByDeath) continue;
 
-	private static boolean isAnyRewindInDimension(RegistryKey<World> dimKey) {
-		for (ActiveRewindSession s : ACTIVE_REWINDS.values()) {
-			if (s.targetCheckpoint.dimension.equals(dimKey)) {
+			ActiveRewindSession session = ACTIVE_REWINDS.get(player.getUuid());
+			if (session != null) {
+				// While rewinding the player is temporarily "dead"/teleporting, but their crater,
+				// broken blocks and killed mobs must still be captured so the rewind can undo them.
+				if (session.deathDimension.equals(world.getRegistryKey())) {
+					double dx = session.deathX - (pos.getX() + 0.5D);
+					double dy = session.deathY - (pos.getY() + 0.5D);
+					double dz = session.deathZ - (pos.getZ() + 0.5D);
+					if (dx * dx + dy * dy + dz * dz <= REWIND_TRACK_RADIUS_SQ) {
+						return true;
+					}
+				}
+				continue;
+			}
+
+			if (!player.isAlive()) continue;
+			if (player.squaredDistanceTo(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D) <= BLOCK_TRACK_RADIUS_SQ) {
 				return true;
 			}
 		}

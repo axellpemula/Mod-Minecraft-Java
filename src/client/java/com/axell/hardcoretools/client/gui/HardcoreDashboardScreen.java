@@ -2931,7 +2931,7 @@ public class HardcoreDashboardScreen extends Screen {
 
 		// 2. Quick Keybinds Reference Strip
 		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w,
-				infoLangIndonesian ? "PINTASAN TOMBOL (KEYBINDS)" : "SHORTCUTS & KEYBINDS");
+				infoLangIndonesian ? "PINTASAN TOMBOL" : "SHORTCUTS & KEYBINDS");
 		y += 15;
 		int third = (w - 8) / 3;
 		String kMenu = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.openDashboardKey, "H");
