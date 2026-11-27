@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "com.wheelofadaptation.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"CameraShakeMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

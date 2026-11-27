@@ -1,0 +1,27 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "misc",
+	"pattern": [
+		"BLB",
+		"CTC",
+		"BLB"
+	],
+	"key": {
+		"B": {
+			"item": "minecraft:iron_bars"
+		},
+		"L": {
+			"item": "minecraft:lightning_rod"
+		},
+		"C": {
+			"item": "minecraft:clock"
+		},
+		"T": {
+			"item": "minecraft:totem_of_undying"
+		}
+	},
+	"result": {
+		"id": "wheel_of_adaptation:seal_of_judgment",
+		"count": 1
+	}
+}
