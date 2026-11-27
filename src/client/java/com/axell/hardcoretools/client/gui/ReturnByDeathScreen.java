@@ -198,15 +198,19 @@ public class ReturnByDeathScreen extends Screen {
 			int bw = 200;
 			int bh = 20;
 			int bx = (this.width - bw) / 2;
-			int b1y = this.height / 4 + 72;
-			int b2y = this.height / 4 + 96;
-			if (mouseX >= bx && mouseX <= bx + bw && ((mouseY >= b1y && mouseY <= b1y + bh) || (mouseY >= b2y && mouseY <= b2y + bh))) {
-				ReturnByDeathClientController.triggerLockedButtonRattle();
-				return true;
+			for (int i = 0; i < BUTTON_COUNT; i++) {
+				int by = this.height / 4 + 72 + i * 24;
+				if (mouseX >= bx && mouseX <= bx + bw && mouseY >= by && mouseY <= by + bh) {
+					// Only the clicked button gets bound by chains — vanilla-clean otherwise.
+					ReturnByDeathClientController.triggerLockedButton(i);
+					return true;
+				}
 			}
 		}
 		return true;
 	}
+
+	private static final int BUTTON_COUNT = 2;
 
 	@Override
 	public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
@@ -235,7 +239,7 @@ public class ReturnByDeathScreen extends Screen {
 			double crackP = elapsed <= act1Ms
 					? 0.0D
 					: (elapsed - act1Ms) / (double) Math.max(1L, shatterMs - act1Ms);
-			renderLockedDeathScreenAndGlassCracks(ctx, elapsed, act1Ms, crackP);
+			renderLockedDeathScreenAndGlassCracks(ctx, elapsed, act1Ms, crackP, mouseX, mouseY);
 			return;
 		}
 
@@ -243,7 +247,7 @@ public class ReturnByDeathScreen extends Screen {
 		renderShatterAndMonochromeRewind(ctx, elapsed, shatterMs, rewindStartMs, act2Ms);
 	}
 
-	private void renderLockedDeathScreenAndGlassCracks(DrawContext ctx, long elapsed, long act1Ms, double crackP) {
+	private void renderLockedDeathScreenAndGlassCracks(DrawContext ctx, long elapsed, long act1Ms, double crackP, int mx, int my) {
 		int sw = this.width;
 		int sh = this.height;
 
@@ -256,9 +260,10 @@ public class ReturnByDeathScreen extends Screen {
 			paneJitterY = (int) Math.round(Math.cos(elapsed * 0.125D) * amp);
 		}
 
-		// Translucent Crimson Death Veil (keeps scattered 3D inventory on the floor clearly visible behind UI!)
-		int topAlpha = (int) Math.min(205, 118 + elapsed * 0.012D);
-		int botAlpha = (int) Math.min(225, 148 + elapsed * 0.014D);
+		// Light translucent Crimson Death Veil — kept subtle so the third-person body and the
+		// scattered 3D inventory stay clearly readable, just like the vanilla death screen.
+		int topAlpha = (int) Math.min(150, 64 + elapsed * 0.008D);
+		int botAlpha = (int) Math.min(170, 86 + elapsed * 0.010D);
 		ctx.fillGradient(0, 0, sw, sh, (topAlpha << 24) | 0x4E0710, (botAlpha << 24) | 0x1E0206);
 
 		// Heartbeat pulse vignette around screen edges
@@ -294,18 +299,38 @@ public class ReturnByDeathScreen extends Screen {
 		int scw = this.textRenderer.getWidth(scoreLine);
 		ctx.drawTextWithShadow(this.textRenderer, scoreLine, (sw - scw) / 2 + paneJitterX, 100 + paneJitterY, 0xFFEAEAEA);
 
-		// Locked & Chained Death Buttons
+		// Vanilla-style death buttons (clean, no locks/chains) — chains only appear on the clicked one
 		long sinceRattle = System.currentTimeMillis() - ReturnByDeathClientController.getLockShakeClickMs();
-		int rattleX = sinceRattle < 360L ? (int) (Math.sin(sinceRattle * 0.08D) * 4.0D) : 0;
+		int rattleX = sinceRattle < 320L ? (int) (Math.sin(sinceRattle * 0.075D) * 3.5D) : 0;
 
 		int bw = 200;
 		int bh = 20;
-		int bx = (sw - bw) / 2 + rattleX + paneJitterX;
+		int bx = (sw - bw) / 2 + paneJitterX;
 		int b1y = sh / 4 + 72 + paneJitterY;
 		int b2y = sh / 4 + 96 + paneJitterY;
 
-		drawChainedLockedButton(ctx, bx, b1y, bw, bh, hc ? "Spectate World" : "Respawn", elapsed, crackP);
-		drawChainedLockedButton(ctx, bx, b2y, bw, bh, "Title Screen", elapsed, crackP);
+		String firstLabel = hc ? "Spectate World" : "Respawn";
+		int lockedIdx = ReturnByDeathClientController.getLockedButtonIndex();
+		float lockP = ReturnByDeathClientController.getLockProgress();
+
+		int hovered = -1;
+		if (mx >= bx && mx <= bx + bw) {
+			if (my >= b1y && my <= b1y + bh) hovered = 0;
+			else if (my >= b2y && my <= b2y + bh) hovered = 1;
+		}
+
+		int shake0 = (lockedIdx == 0 && lockP > 0.0F) ? rattleX : 0;
+		int shake1 = (lockedIdx == 1 && lockP > 0.0F) ? rattleX : 0;
+
+		drawVanillaDeathButton(ctx, bx + shake0, b1y, bw, bh, firstLabel, hovered == 0, crackP);
+		drawVanillaDeathButton(ctx, bx + shake1, b2y, bw, bh, "Title Screen", hovered == 1, crackP);
+
+		// Chain & padlock binding animation, ONLY on the button that was just clicked
+		if (lockP > 0.0F && lockedIdx >= 0 && lockedIdx < BUTTON_COUNT) {
+			int ly = lockedIdx == 0 ? b1y : b2y;
+			int lx = bx + (lockedIdx == 0 ? shake0 : shake1);
+			drawBindingChains(ctx, lx, ly, bw, bh, lockP);
+		}
 
 		// Ominous Abyssal Whisper Subtitle
 		String whisper;
@@ -329,25 +354,83 @@ public class ReturnByDeathScreen extends Screen {
 		}
 	}
 
-	private void drawChainedLockedButton(DrawContext ctx, int x, int y, int w, int h, String label, long elapsed, double crackP) {
-		ctx.fill(x, y, x + w, y + h, 0xD81A1016);
-		int borderCol = crackP > 0.05D ? 0xFFE2E8F0 : 0xFF7F1D1D;
+	/**
+	 * Clean vanilla-looking death button ("Respawn" / "Spectate World" / "Title Screen") with a
+	 * crimson abyssal tint so it still matches the Void Sovereign death screen.
+	 */
+	private void drawVanillaDeathButton(DrawContext ctx, int x, int y, int w, int h, String label, boolean hovered, double crackP) {
+		int bg = hovered ? 0xE03A1420 : 0xD81A1016;
+		ctx.fill(x, y, x + w, y + h, bg);
+		int borderCol = crackP > 0.05D ? 0xFFE2E8F0 : (hovered ? 0xFFF87171 : 0xFF7F1D1D);
 		ctx.drawBorder(x, y, w, h, borderCol);
-		ctx.fill(x + 1, y + 1, x + w - 1, y + 2, 0x38FCA5A5);
+		ctx.fill(x + 1, y + 1, x + w - 1, y + 2, hovered ? 0x66FCA5A5 : 0x38FCA5A5);
 
-		// Diagonal iron-crimson chain links binding the button
-		int chainColor = 0xAA4C1D24;
-		int chainHi = 0x99F87171;
-		for (int i = 16; i < w - 16; i += 28) {
-			ctx.fill(x + i, y - 1, x + i + 8, y + 3, chainColor);
-			ctx.fill(x + i + 1, y, x + i + 7, y + 1, chainHi);
-			ctx.fill(x + i + 10, y + h - 2, x + i + 18, y + h + 2, chainColor);
-			ctx.fill(x + i + 11, y + h - 1, x + i + 17, y + h, chainHi);
+		int textColor = hovered ? 0xFFFFFFFF : 0xFFE5E7EB;
+		int lw = this.textRenderer.getWidth(label);
+		ctx.drawTextWithShadow(this.textRenderer, label, x + (w - lw) / 2, y + 6, textColor);
+	}
+
+	/**
+	 * Chains + padlock snapping around a button after it is clicked.
+	 * lockP fades 1.0 -> 0.0 over 1.4s, so the bindings uncoil & dissolve on their own.
+	 */
+	private void drawBindingChains(DrawContext ctx, int x, int y, int w, int h, float lockP) {
+		float snap = Math.min(1.0F, (1.0F - lockP) * 3.2F);   // 0.0 = just snapped on
+		float alpha = Math.min(1.0F, lockP * 1.6F);           // fade out near the end
+		int a = (int) Math.round(235 * alpha);
+		if (a <= 4) {
+			return;
 		}
 
-		String lockedLabel = "\u26D3  " + label + "  [\uD83D\uDD12]  \u26D3";
-		int lw = this.textRenderer.getWidth(lockedLabel);
-		ctx.drawTextWithShadow(this.textRenderer, lockedLabel, x + (w - lw) / 2, y + 6, 0xFF9CA3AF);
+		int chainDark = (a << 24) | 0x3F2A2F;
+		int chainHi = (a << 24) | 0xF87171;
+		int chainSteel = (a << 24) | 0xCBD5E1;
+
+		// 1. Two iron bands wrapping around the button (top & bottom), anchored beyond the edges
+		int bandInset = (int) Math.round((1.0F - snap) * (w * 0.45F));
+		for (int band = 0; band < 2; band++) {
+			int by = band == 0 ? y - 2 : y + h;
+			int startX = x + bandInset;
+			int endX = x + w - bandInset;
+			if (endX - startX < 10) {
+				continue;
+			}
+			for (int i = startX; i < endX - 6; i += 12) {
+				int segEnd = Math.min(endX, i + 9);
+				ctx.fill(i, by, segEnd, by + 4, chainDark);
+				ctx.fill(i + 1, by + 1, segEnd - 1, by + 2, chainHi);
+			}
+		}
+
+		// 2. Diagonal chain crossing the face of the button, drawn link by link
+		int links = 10;
+		int visible = Math.max(0, (int) Math.round(links * snap * 3.0F));
+		for (int i = 0; i < Math.min(links, visible); i++) {
+			int px = x + 8 + (int) ((w - 24) * (i / (float) Math.max(1, links - 1)));
+			int py = y + 4 + (i % 2 == 0 ? 0 : 2);
+			ctx.fill(px, py, px + 9, py + 3, chainDark);
+			ctx.fill(px + 1, py, px + 8, py + 1, chainSteel);
+			// Alternate diagonal offset to read as interlocking rings
+			if (i % 2 == 0) {
+				ctx.fill(px + 3, py + 3, px + 6, py + 5, chainHi);
+			}
+		}
+
+		// 3. Padlock clamping shut in the middle of the button
+		int lx = x + w / 2 - 6;
+		int ly = y + h / 2 - 7;
+		int lockAlpha = (int) Math.round(255 * Math.max(0.0F, Math.min(1.0F, snap * 2.0F)));
+		int gold = (lockAlpha << 24) | 0xFBBF24;
+		int goldDark = (lockAlpha << 24) | 0xB45309;
+		// shackle
+		ctx.fill(lx + 1, ly, lx + 11, ly + 2, gold);
+		ctx.fill(lx, ly + 1, lx + 2, ly + 5, gold);
+		ctx.fill(lx + 10, ly + 1, lx + 12, ly + 5, gold);
+		// body
+		ctx.fill(lx - 1, ly + 5, lx + 13, ly + 14, gold);
+		ctx.fill(lx - 1, ly + 5, lx + 13, ly + 6, goldDark);
+		// keyhole
+		ctx.fill(lx + 5, ly + 8, lx + 7, ly + 12, 0xFF1A1016);
 	}
 
 	private void drawFullScreenGlassCracks(DrawContext ctx, float crackP) {

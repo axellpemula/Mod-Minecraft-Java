@@ -17,6 +17,7 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.Perspective;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.ShaderProgram;
 import net.minecraft.client.gl.SimpleFramebuffer;
@@ -38,6 +39,7 @@ import net.minecraft.util.math.MathHelper;
 
 public final class ReturnByDeathClientController {
 	private static final Gson GSON = new Gson();
+	private static final long LOCK_EFFECT_MS = 1400L;
 
 	public record RewindFrame(
 			double p,
@@ -76,6 +78,12 @@ public final class ReturnByDeathClientController {
 	private static boolean playedColorAwakening = false;
 	private static int lastClockTickIdx = -1;
 	private static long lockShakeClickMs = 0L;
+	private static int lockedButtonIndex = -1;
+
+	// Vanilla-style "soul leaving the body" death camera state
+	private static Perspective savedPerspective = null;
+	private static boolean perspectiveForced = false;
+
 
 	private ReturnByDeathClientController() {
 	}
@@ -137,37 +145,85 @@ public final class ReturnByDeathClientController {
 		return lockShakeClickMs;
 	}
 
-	public static void triggerLockedButtonRattle() {
+	/** -1 = nothing locked, otherwise the index of the death-screen button that was just bound. */
+	public static int getLockedButtonIndex() {
+		return lockedButtonIndex;
+	}
+
+	/** 1.0 right after the click, fading down to 0.0 over 1.4s (0.0 = no chains drawn). */
+	public static float getLockProgress() {
+		if (lockShakeClickMs <= 0L) {
+			return 0.0F;
+		}
+		long since = System.currentTimeMillis() - lockShakeClickMs;
+		if (since < 0L || since >= LOCK_EFFECT_MS) {
+			return 0.0F;
+		}
+		return 1.0F - (since / (float) LOCK_EFFECT_MS);
+	}
+
+	public static void triggerLockedButton(int index) {
+		lockedButtonIndex = index;
 		lockShakeClickMs = System.currentTimeMillis();
 		playVanillaSound("block.chain.place", 0.72F);
+		playVanillaSound("block.chain.hit", 1.32F);
 		playVanillaSound("block.respawn_anchor.deplete", 1.45F);
 	}
 
+	/** 0.0 -> 1.0 -> 0.0 pulse used to swing the chains in and settle them (1.4s total). */
+	public static float getChainBindProgress() {
+		float p = 1.0F - getLockProgress();
+		if (p <= 0.0F) {
+			return 0.0F;
+		}
+		return (float) easeInOutCubic(p);
+	}
+
 	/**
-	 * Sideways corpse-collapse camera roll:
-	 * - 0.0s .. 0.45s: collapses smoothly from 0° to 56° onto the ground
-	 * - 0.45s .. 6.0s: lies collapsed at 56° while items scatter & glass slowly cracks
-	 * - 6.0s .. 7.2s: rises smoothly back to 0° upright as items fly back & rewind begins!
+	 * Authentic-Vanilla "soul leaving the body" death camera.
+	 * <p>
+	 * Vanilla itself does NOT tilt the view sideways: on death it forces third-person and the
+	 * camera keeps the player's look angle, so you hover a few blocks behind/above your own body.
+	 * Because the player entity keeps that rotation, holding a straight look angle means the camera
+	 * looks down at the corpse from above — exactly the "zoom out & stare down at your whole body"
+	 * framing people remember.
+	 * <p>
+	 * Timeline:
+	 * - 0.00s .. 0.55s: camera pulls out and swings up above the body (smooth ease-out)
+	 * - 0.55s .. 6.00s: hovers above/behind the corpse while items scatter, tiny breathing drift
+	 * - 6.00s .. 7.20s: glides back down into the body while the world rewinds
+	 * - Rotation roll is only a tiny 3D "slump" wobble, never a sideways first-person tilt.
 	 */
 	public static float getDeathCameraRollDegrees() {
 		if (!active) return 0.0F;
 		long elapsed = getElapsedMs();
-		if (elapsed < 450L) {
-			double t = elapsed / 450.0D;
-			double ease = 1.0D - Math.pow(1.0D - t, 3.0D);
-			return (float) (56.0D * ease);
+		if (elapsed >= shatterMs + 1200L) {
+			return 0.0F;
+		}
+		// Gentle astral sway only — vanilla stays upright, so keep this subtle (max ~3.5°)
+		double sway = Math.sin(elapsed * 0.0016D) * 3.5D;
+		double fade;
+		if (elapsed < 600L) {
+			fade = elapsed / 600.0D;
+		} else if (elapsed < shatterMs) {
+			fade = 1.0D;
+		} else {
+			fade = Math.max(0.0D, 1.0D - (elapsed - shatterMs) / 1200.0D);
+		}
+		return (float) (sway * fade);
+	}
+
+	/** 0.0 -> 1.0: how far the death camera has swung out & above the corpse. */
+	private static double deathCameraOutAmount(long elapsed) {
+		if (elapsed < 550L) {
+			double t = elapsed / 550.0D;
+			return 1.0D - Math.pow(1.0D - t, 3.0D);
 		}
 		if (elapsed < shatterMs) {
-			double shudder = Math.sin(elapsed * 0.012D) * 1.1D;
-			return (float) (56.0D + shudder);
+			return 1.0D;
 		}
-		long riseSpan = 1200L; // 6.0s .. 7.2s
-		if (elapsed < shatterMs + riseSpan) {
-			double t = (elapsed - shatterMs) / (double) riseSpan;
-			double ease = -(Math.cos(Math.PI * t) - 1.0D) / 2.0D;
-			return (float) (56.0D * (1.0D - ease));
-		}
-		return 0.0F;
+		double riseT = Math.min(1.0D, (elapsed - shatterMs) / Math.max(1.0D, rewindStartMs - shatterMs));
+		return 1.0D - easeInOutSine(riseT);
 	}
 
 	/**
@@ -246,6 +302,8 @@ public final class ReturnByDeathClientController {
 			playedColorAwakening = false;
 			lastClockTickIdx = -1;
 			lockShakeClickMs = 0L;
+			lockedButtonIndex = -1;
+			perspectiveForced = false;
 
 			// Act 1 (0.0s): Heavy Death Impact + Abyssal Bell + Witch's Call
 			playVanillaSound("entity.warden.heartbeat", 0.64F);
@@ -262,6 +320,9 @@ public final class ReturnByDeathClientController {
 	public static void reset() {
 		active = false;
 		frames = List.of();
+		lockShakeClickMs = 0L;
+		lockedButtonIndex = -1;
+		restoreDeathCamera(MinecraftClient.getInstance());
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (mc != null && mc.currentScreen instanceof ReturnByDeathScreen) {
 			mc.setScreen(null);
@@ -281,6 +342,9 @@ public final class ReturnByDeathClientController {
 		if (elapsed >= durationMs) {
 			reset();
 			return;
+		}
+		if (elapsed >= rewindStartMs) {
+			restoreDeathCamera(client);
 		}
 
 		// Keep ReturnByDeathScreen open through Act 1 (0..4.5s) & Act 2 (4.5..15.0s), then release at 15.0s for Act 3!
@@ -359,11 +423,11 @@ public final class ReturnByDeathClientController {
 
 	/**
 	 * Runs right before Camera#update in GameRenderer#renderWorld at native monitor FPS (60/144/240 Hz):
-	 * - During 0.0s..6.6s: lowers eye position near the ground like a collapsed corpse, then smoothly rises back up
+	 * - During 0.0s..6.6s: force third-person so the camera floats out & above the body (vanilla death look)
 	 * - During 6.6s..15.0s: glides backward along a C1-continuous Catmull-Rom cubic spline across the last 60s!
 	 */
 	public static void onBeforeWorldRender() {
-		if (!active || frames.isEmpty()) {
+		if (!active) {
 			return;
 		}
 		MinecraftClient mc = MinecraftClient.getInstance();
@@ -377,26 +441,28 @@ public final class ReturnByDeathClientController {
 			return;
 		}
 
+		// Vanilla-style death framing runs even without recorded frames (e.g. freshly joined worlds)
+		if (elapsed < rewindStartMs) {
+			applyDeathCameraFraming(mc, elapsed);
+		} else {
+			restoreDeathCamera(mc);
+		}
+
+		if (frames.isEmpty()) {
+			return;
+		}
+
 		String currentDim = mc.world.getRegistryKey().getValue().toString();
 
 		if (elapsed < rewindStartMs) {
 			RewindFrame first = frames.get(0);
 			if (first.dim.equals(currentDim)) {
-				// Collapse eye height onto the ground (0..0.45s), stay down through 6.0s, then rise back by 6.6s!
-				double collapseAmt;
-				if (elapsed < 450L) {
-					collapseAmt = 1.0D - Math.pow(1.0D - (elapsed / 450.0D), 3.0D);
-				} else if (elapsed < shatterMs) {
-					collapseAmt = 1.0D;
-				} else {
-					double riseT = (elapsed - shatterMs) / (double) Math.max(1L, rewindStartMs - shatterMs);
-					collapseAmt = 1.0D - easeInOutSine(riseT);
-				}
-
-				double beat = Math.sin(elapsed * 0.008D) * 0.45D * collapseAmt;
-				double droppedY = first.y - (0.72D * collapseAmt);
-				float fallenPitch = MathHelper.clamp(first.pitch + (float) (14.0D * collapseAmt + beat), -90.0F, 90.0F);
-				applySmoothPlayerCamera(player, first.x, droppedY, first.z, first.yaw, fallenPitch);
+				// Act 1: camera floats out of the body and cranes DOWN over it — the classic vanilla
+				// "soul leaves the body, you look at your own corpse from above" framing.
+				double out = deathCameraOutAmount(elapsed);
+				float overheadPitch = MathHelper.clamp((float) (42.0D * out), -90.0F, 90.0F);
+				double breath = Math.sin(elapsed * 0.0016D) * 0.06D * out;
+				applySmoothPlayerCamera(player, first.x, first.y + breath, first.z, first.yaw, overheadPitch);
 			}
 			return;
 		}
@@ -441,6 +507,40 @@ public final class ReturnByDeathClientController {
 		long isky = Math.round(p1.skyTime + (p2.skyTime - p1.skyTime) * t);
 		if (isky >= 0L && "minecraft:overworld".equals(currentDim)) {
 			mc.world.setTimeOfDay(isky);
+		}
+	}
+
+	/**
+	 * Vanilla-style death camera framing: force third-person ("out from the body") and tilt the head
+	 * down so the whole corpse is visible from above, then release everything once the rewind starts.
+	 */
+	private static void applyDeathCameraFraming(MinecraftClient mc, long elapsed) {
+		if (mc.options == null || mc.player == null) {
+			return;
+		}
+		boolean wantThirdPerson = elapsed < shatterMs;
+
+		if (wantThirdPerson) {
+			if (!perspectiveForced) {
+				savedPerspective = mc.options.getPerspective();
+				perspectiveForced = true;
+			}
+			if (mc.options.getPerspective().isFirstPerson()) {
+				mc.options.setPerspective(Perspective.THIRD_PERSON_BACK);
+			}
+		} else if (perspectiveForced) {
+			restoreDeathCamera(mc);
+		}
+	}
+
+	private static void restoreDeathCamera(MinecraftClient mc) {
+		if (mc == null || mc.options == null) {
+			return;
+		}
+		if (perspectiveForced) {
+			mc.options.setPerspective(savedPerspective == null ? Perspective.FIRST_PERSON : savedPerspective);
+			perspectiveForced = false;
+			savedPerspective = null;
 		}
 	}
 

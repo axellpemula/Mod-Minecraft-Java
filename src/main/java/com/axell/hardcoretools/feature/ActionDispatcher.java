@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Locale;
 
 import com.axell.hardcoretools.mixin.LevelInfoAccessor;
+import com.axell.hardcoretools.mixin.LevelPropertiesAccessor;
 import com.axell.hardcoretools.network.HardcoreNetworking;
 import com.axell.hardcoretools.state.HardcoreStateManager;
 import com.axell.hardcoretools.state.PlayerProfile;
@@ -28,9 +29,11 @@ import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.world.Difficulty;
+import net.minecraft.world.SaveProperties;
 import net.minecraft.world.GameMode;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.level.LevelInfo;
+import net.minecraft.world.level.LevelProperties;
 
 public final class ActionDispatcher {
 	private static final Gson GSON = new Gson();
@@ -606,29 +609,29 @@ public final class ActionDispatcher {
 			}
 			case "survival" -> {
 				boolean wasHardcore = info.isHardcore();
-				if (wasHardcore) {
-					((LevelInfoAccessor) (Object) info).hardcoreTools$setHardcore(false);
-					server.setDifficultyLocked(false);
-				}
+				setWorldHardcore(server, false);
+				server.setDifficultyLocked(false);
 				player.changeGameMode(GameMode.SURVIVAL);
 				player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
 						SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 0.8F, 1.15F);
 				if (wasHardcore) {
-					broadcastWorldHardcoreSync(server, player);
+					persistWorldProperties(server);
 				}
+				broadcastWorldHardcoreSync(server);
 				return "✦ GameMode: Survival (Standard Hearts)";
 			}
 			case "hardcore" -> {
 				boolean changedWorldFlag = !info.isHardcore();
-				((LevelInfoAccessor) (Object) info).hardcoreTools$setHardcore(true);
+				setWorldHardcore(server, true);
 				server.setDifficulty(Difficulty.HARD, true);
 				server.setDifficultyLocked(true);
 				player.changeGameMode(GameMode.SURVIVAL);
 				player.getWorld().playSound(null, player.getX(), player.getY(), player.getZ(),
 						SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 0.85F, 1.15F);
 				if (changedWorldFlag) {
-					broadcastWorldHardcoreSync(server, player);
+					persistWorldProperties(server);
 				}
+				broadcastWorldHardcoreSync(server);
 				return "☠ GameMode: HARDCORE! (Hardcore Hearts Active)";
 			}
 			case "spectator" -> {
@@ -649,11 +652,39 @@ public final class ActionDispatcher {
 		}
 	}
 
-	private static void broadcastWorldHardcoreSync(MinecraftServer server, ServerPlayerEntity initiator) {
+	/**
+	 * Flips the REAL hardcore flag stored on the world's LevelProperties.
+	 * SaveProperties#getLevelInfo() hands out a copy (withCopiedGameRules()), so writing to it
+	 * silently did nothing before. This resolves the genuine LevelInfo instance instead, which
+	 * makes the hardcore hearts, the "Game Over!" death screen and the level.dat entry all
+	 * switch live while in-game.
+	 */
+	private static void setWorldHardcore(MinecraftServer server, boolean hardcore) {
+		SaveProperties saveProperties = server.getSaveProperties();
+		LevelInfo realInfo = null;
+		if (saveProperties instanceof LevelProperties levelProperties) {
+			realInfo = ((LevelPropertiesAccessor) levelProperties).hardcoreTools$getLevelInfo();
+		}
+		if (realInfo == null) {
+			realInfo = saveProperties.getLevelInfo();
+		}
+		((LevelInfoAccessor) (Object) realInfo).hardcoreTools$setHardcore(hardcore);
+	}
+
+	/**
+	 * Writes level.dat immediately so the toggle survives a crash / force-close and shows up as
+	 * "Hardcore Mode" in the singleplayer world list.
+	 */
+	private static void persistWorldProperties(MinecraftServer server) {
+		try {
+			server.saveAll(false, true, true);
+		} catch (Exception ignored) {
+		}
+	}
+
+	private static void broadcastWorldHardcoreSync(MinecraftServer server) {
 		for (ServerPlayerEntity other : server.getPlayerManager().getPlayerList()) {
-			if (other != initiator) {
-				HardcoreNetworking.sendSyncState(other, "", true);
-			}
+			HardcoreNetworking.sendSyncState(other, "", true);
 		}
 	}
 

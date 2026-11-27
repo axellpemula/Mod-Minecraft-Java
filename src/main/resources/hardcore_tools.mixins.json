@@ -6,6 +6,7 @@
 		"CreeperEntityMixin",
 		"HopperBlockEntityMixin",
 		"LevelInfoAccessor",
+		"LevelPropertiesAccessor",
 		"ServerPlayerInteractionManagerMixin",
 		"WorldMixin"
 	],
