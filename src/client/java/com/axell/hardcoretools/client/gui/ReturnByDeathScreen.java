@@ -7,6 +7,7 @@ import java.util.Random;
 
 import org.joml.Matrix4f;
 
+import com.axell.hardcoretools.HardcoreToolsMod;
 import com.axell.hardcoretools.client.ReturnByDeathClientController;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -21,6 +22,7 @@ import net.minecraft.client.render.Tessellator;
 import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 /**
  * 20s Return by Death Cinema Screen (Acts 1 & 2: 0.0s - 17.0s):
@@ -488,64 +490,92 @@ public class ReturnByDeathScreen extends Screen {
 	}
 
 	/**
-	 * Two chains snapping across a button in an X, clamped by a padlock in the middle.
-	 * lockP goes 1.0 -> 0.0 over 1.4s, so the bindings visibly lock on and then dissolve.
-	 * <p>
-	 * Everything is contained strictly inside the button rect (x, y, w, h): a dimming
-	 * overlay + double locked frame gives the effect a clear boundary, and the chain
-	 * endpoints are inset so no link ever spills outside the button.
+	 * Dedicated HD RGBA sprite assets for the clicked-button chain-and-padlock seal,
+	 * eliminating procedural quad artifacts and keeping every link crisp across all GUI scales.
+	 */
+	private static final Identifier BUTTON_CHAIN_A_TEX = Identifier.of(HardcoreToolsMod.MOD_ID, "textures/gui/button_chain_a.png");
+	private static final Identifier BUTTON_CHAIN_B_TEX = Identifier.of(HardcoreToolsMod.MOD_ID, "textures/gui/button_chain_b.png");
+	private static final Identifier BUTTON_PADLOCK_TEX = Identifier.of(HardcoreToolsMod.MOD_ID, "textures/gui/button_padlock.png");
+	private static final int CHAIN_TEX_W = 600;
+	private static final int CHAIN_TEX_H = 60;
+	private static final int PADLOCK_TEX_SIZE = 96;
+
+	/**
+	 * Two forged iron chains shooting across the clicked button in an X and clamped by an
+	 * ornate Void Sovereign padlock in the middle, rendered from dedicated 3x HD RGBA assets.
+	 * lockP goes 1.0 -> 0.0 over 1.4s, so the bindings visibly snap shut and then dissolve.
 	 */
 	private void drawBindingChains(DrawContext ctx, int x, int y, int w, int h, float lockP) {
-		float bind = 1.0F - lockP;                    // 0.0 = just clicked, 1.0 = fully dissolved
-		float draw = Math.min(1.0F, bind * 3.0F);      // chains fully drawn by ~0.47s
+		float bind = 1.0F - lockP; // 0.0 = just clicked, 1.0 = fully dissolved
 		float alpha = lockP <= 0.28F ? lockP / 0.28F : 1.0F;
 		float alphaF = Math.max(0.0F, Math.min(1.0F, alpha));
 		int a = (int) Math.round(255 * alphaF);
-		if (a <= 6 || draw <= 0.01F) {
+		if (a <= 6) {
 			return;
 		}
 
-		// 1. Locked boundary: dim the label inside the button and frame it, so the
-		//    "bound" state reads as a deliberate locked button, not a floating blob.
-		int overlayA = (int) Math.round(105 * Math.min(1.0F, bind * 2.5F) * alphaF);
+		// 1. Locked button boundary: subtle dark veil inside the button + crisp steel/crimson frame
+		int overlayA = (int) Math.round(125 * Math.min(1.0F, bind * 4.0F) * alphaF);
 		if (overlayA > 0) {
-			ctx.fill(x, y, x + w, y + h, (overlayA << 24) | 0x0B0710);
+			ctx.fill(x + 1, y + 1, x + w - 1, y + h - 1, (overlayA << 24) | 0x08090E);
 		}
-		ctx.drawBorder(x, y, w, h, (a << 24) | 0xE2E8F0);
+		ctx.drawBorder(x, y, w, h, (a << 24) | 0x94A3B8);
 		if (w > 4 && h > 4) {
-			ctx.drawBorder(x + 1, y + 1, w - 2, h - 2, (a << 24) | 0xFBBF24);
+			ctx.drawBorder(x + 1, y + 1, w - 2, h - 2, ((a * 3 / 5) << 24) | 0xF87171);
 		}
 
-		// 2. Chains, inset inside the button so they never cross its border.
-		//    Chain A: top-left -> bottom-right. Chain B: bottom-left -> top-right.
-		float insetX = 6.0F;
-		float insetY = 3.0F;
-		float x1 = x + insetX, x2 = x + w - insetX;
-		float yTop = y + insetY, yBot = y + h - insetY;
-		drawDiagonalChain(ctx, x1, yTop, x2, yBot, draw, a);
-		drawDiagonalChain(ctx, x1, yBot, x2, yTop, draw, a);
+		// Flush DrawContext quads before textured sprite draws with custom shader alpha
+		ctx.draw();
+		RenderSystem.enableBlend();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alphaF);
 
-		// 3. Glowing impact spark where the two chains cross while they snap closed
-		float sparkAlpha = Math.max(0.0F, 1.0F - bind * 4.0F) * alphaF;
-		if (sparkAlpha > 0.02F) {
-			int cx = x + w / 2;
-			int cy = y + h / 2;
-			int sa = (int) Math.round(220 * sparkAlpha);
-			ctx.fill(cx - 10, cy - 1, cx + 10, cy + 1, (sa << 24) | 0xFEF3C7);
-			ctx.fill(cx - 1, cy - 10, cx + 1, cy + 10, (sa << 24) | 0xFEF3C7);
+		// 2. Chain A shoots left -> right at constant 1:1 link aspect (no horizontal stretching)
+		float chainAP = Math.min(1.0F, bind * 5.2F);
+		int drawWA = Math.round(w * chainAP);
+		int regWA = Math.round(CHAIN_TEX_W * chainAP);
+		if (drawWA > 1 && regWA > 1) {
+			ctx.drawTexture(BUTTON_CHAIN_A_TEX, x, y, drawWA, h,
+					0.0F, 0.0F, regWA, CHAIN_TEX_H, CHAIN_TEX_W, CHAIN_TEX_H);
 		}
 
-		// 4. Padlock clamping shut exactly on the X crossing, with a dark backing disc
-		//    so it pops over the chains and the dimmed label. Ease-out-back gives it a
-		//    snap/clamp feel instead of a linear grow.
-		float rawScale = Math.min(1.0F, bind * 3.5F);
-		float lockScale = easeOutBack(rawScale);
-		if (lockScale > 0.05F) {
+		// 3. Chain B shoots right -> left right across Chain A (staggered by ~70ms for crisp X-snap)
+		float chainBP = Math.max(0.0F, Math.min(1.0F, (bind - 0.05F) * 5.2F));
+		int drawWB = Math.round(w * chainBP);
+		int regWB = Math.round(CHAIN_TEX_W * chainBP);
+		if (drawWB > 1 && regWB > 1) {
+			float uStart = (float) (CHAIN_TEX_W - regWB);
+			ctx.drawTexture(BUTTON_CHAIN_B_TEX, x + w - drawWB, y, drawWB, h,
+					uStart, 0.0F, regWB, CHAIN_TEX_H, CHAIN_TEX_W, CHAIN_TEX_H);
+		}
+
+		// 4. Center Void Sovereign Padlock snapping shut with ease-out-back bounce
+		float padlockRaw = Math.max(0.0F, Math.min(1.0F, (bind - 0.09F) * 4.8F));
+		if (padlockRaw > 0.02F) {
+			float lockScale = easeOutBack(padlockRaw);
+			float cx = x + w * 0.5F;
+			float cy = y + h * 0.5F;
+			int lockSize = Math.max(12, h - 2); // 18x18 settled (stays strictly <= 20px button height even on bounce)
+			int halfLock = lockSize / 2;
+
+			ctx.getMatrices().push();
+			ctx.getMatrices().translate(cx, cy, 0.0F);
+			ctx.getMatrices().scale(lockScale, lockScale, 1.0F);
+			ctx.drawTexture(BUTTON_PADLOCK_TEX, -halfLock, -halfLock, lockSize, lockSize,
+					0.0F, 0.0F, PADLOCK_TEX_SIZE, PADLOCK_TEX_SIZE, PADLOCK_TEX_SIZE, PADLOCK_TEX_SIZE);
+			ctx.getMatrices().pop();
+		}
+
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+		// 5. Brief golden-crimson impact spark right as the padlock clamps shut
+		float sparkEnv = Math.max(0.0F, 1.0F - Math.abs(bind - 0.16F) * 9.0F) * alphaF;
+		if (sparkEnv > 0.04F) {
 			int cx = x + w / 2;
 			int cy = y + h / 2;
-			int backA = (int) Math.round(200 * alphaF);
-			CrimsonTheme.drawCircle(ctx, cx, cy, 9.0F * lockScale, (backA << 24) | 0x0B0710);
-			drawCenterPadlock(ctx, cx, cy, lockScale, (a << 24) | 0xFBBF24, a);
+			int sa = (int) Math.round(210 * sparkEnv);
+			ctx.fill(cx - 11, cy, cx + 11, cy + 1, (sa << 24) | 0xFEF3C7);
+			ctx.fill(cx, cy - 8, cx + 1, cy + 8, (sa << 24) | 0xFCA5A5);
 		}
 	}
 
@@ -555,118 +585,6 @@ public class ReturnByDeathScreen extends Screen {
 		float c3 = c1 + 1.0F;
 		float u = Math.max(0.0F, Math.min(1.0F, t)) - 1.0F;
 		return 1.0F + c3 * u * u * u + c1 * u * u;
-	}
-
-	/**
-	 * Draws one chain as a continuous run of rotated links following the diagonal.
-	 * Links overlap slightly (length &gt; spacing) and alternate orientation by 90 degrees
-	 * like a real chain, instead of axis-aligned rectangles with gaps between them.
-	 * The last link fades in fractionally so the reveal doesn't pop link-by-link.
-	 */
-	private void drawDiagonalChain(DrawContext ctx, float sx, float sy, float ex, float ey,
-								   float progress, int alpha) {
-		float dx = ex - sx;
-		float dy = ey - sy;
-		float len = (float) Math.hypot(dx, dy);
-		if (len < 1.0F || progress <= 0.0F) {
-			return;
-		}
-		float ux = dx / len;
-		float uy = dy / len;
-		float px = -uy;
-		float py = ux;
-
-		float spacing = 8.0F;
-		int links = Math.max(2, (int) Math.ceil(len / spacing));
-		float exact = links * Math.max(0.0F, Math.min(1.0F, progress));
-
-		ctx.draw();
-		RenderSystem.enableBlend();
-		RenderSystem.defaultBlendFunc();
-		RenderSystem.disableCull();
-		RenderSystem.disableDepthTest();
-		RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-
-		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
-		BufferBuilder quads = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-
-		for (int i = 0; i < links; i++) {
-			float linkP = Math.max(0.0F, Math.min(1.0F, exact - i));
-			if (linkP <= 0.01F) {
-				continue;
-			}
-			int la = (int) Math.round(alpha * linkP);
-			if (la <= 4) {
-				continue;
-			}
-			float dist = (i + 0.5F) * (len / links);
-			float cx = sx + ux * dist;
-			float cy = sy + uy * dist;
-			boolean along = i % 2 == 0;
-			// Even links run along the chain, odd links run across it (alternating chain links).
-			float ax = along ? ux : px;
-			float ay = along ? uy : py;
-			float bx = along ? px : ux;
-			float by = along ? py : uy;
-			int steel = (la << 24) | (i % 5 == 0 ? 0xFCA5A5 : 0xE2E8F0);
-			int dark = (la << 24) | 0x1E293B;
-			// Dark outline quad slightly larger, then steel quad on top.
-			emitRotatedRect(quads, mat, cx, cy, ax, ay, bx, by, 5.2F, 2.6F, dark);
-			emitRotatedRect(quads, mat, cx, cy, ax, ay, bx, by, 4.4F, 1.7F, steel);
-		}
-
-		BuiltBuffer built = quads.endNullable();
-		if (built != null) {
-			BufferRenderer.drawWithGlobalProgram(built);
-		}
-		RenderSystem.enableDepthTest();
-		RenderSystem.enableCull();
-		RenderSystem.defaultBlendFunc();
-		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-	}
-
-	/** Emits one rotated rectangle quad centred on (cx, cy). */
-	private static void emitRotatedRect(BufferBuilder buf, Matrix4f mat,
-										float cx, float cy,
-										float ax, float ay, float bx, float by,
-										float halfLen, float halfWid, int argb) {
-		float lx = ax * halfLen;
-		float ly = ay * halfLen;
-		float wx = bx * halfWid;
-		float wy = by * halfWid;
-		buf.vertex(mat, cx - lx - wx, cy - ly - wy, 0.0F).color(argb);
-		buf.vertex(mat, cx + lx - wx, cy + ly - wy, 0.0F).color(argb);
-		buf.vertex(mat, cx + lx + wx, cy + ly + wy, 0.0F).color(argb);
-		buf.vertex(mat, cx - lx + wx, cy - ly + wy, 0.0F).color(argb);
-	}
-
-	/** Gold padlock with shackle, drawn centred on (cx, cy) and sized to fit the button height. */
-	private void drawCenterPadlock(DrawContext ctx, int cx, int cy, float scale, int gold, int alpha) {
-		int bodyW = Math.max(6, (int) Math.round(14 * scale));
-		int bodyH = Math.max(5, (int) Math.round(10 * scale));
-		int bx = cx - bodyW / 2;
-		int by = cy - bodyH / 2 + 2;
-
-		int goldDark = (alpha << 24) | 0xB45309;
-		int keyhole = (alpha << 24) | 0x1A1016;
-
-		// Shackle (arch above the body, kept short so the whole lock fits inside the button)
-		int archW = Math.max(4, bodyW - 4);
-		int ax = cx - archW / 2;
-		int ay = by - (int) Math.round(5 * scale);
-		ctx.fill(ax, ay, ax + archW, ay + 2, goldDark);
-		ctx.fill(ax, ay + 2, ax + 2, by + 1, gold);
-		ctx.fill(ax + archW - 2, ay + 2, ax + archW, by + 1, gold);
-
-		// Body
-		ctx.fill(bx, by, bx + bodyW, by + bodyH, gold);
-		ctx.fill(bx, by, bx + bodyW, by + Math.max(1, bodyH / 4), goldDark);
-		ctx.drawBorder(bx, by, bodyW, bodyH, goldDark);
-
-		// Keyhole
-		int kx = cx - 1;
-		int ky = by + bodyH / 3;
-		ctx.fill(kx, ky, kx + 2, ky + Math.max(2, bodyH / 3), keyhole);
 	}
 
 	private void drawFullScreenGlassCracks(DrawContext ctx, float crackP) {
