@@ -827,7 +827,7 @@ public final class ReturnByDeathClientController {
 
 			// 24 rotating radial chrono-notches riding along the iris horizon
 			if (coreRadius > 18.0F) {
-				double spin = -getElapsedMs() * 0.0018D;
+				double spin = -(active ? getElapsedMs() : System.currentTimeMillis()) * 0.0018D;
 				BufferBuilder ticks = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
 				for (int i = 0; i < 24; i++) {
 					double a = spin + (i * Math.PI * 2.0D / 24.0D);

@@ -1,6 +1,6 @@
 # Void Sovereign — Fabric 1.21.1 Edition
 
-Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema)**, **Live Weapon Damage & Combat Aim Studio (All-Weapons Catalog, Bag Forge, Aimbot & Aim Silent FOV Circle)**, **Quick Radial Wheel (`R`)**, **Arcane Altar Item Upgrader + Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
+Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema, Ultra-Thin Borders)**, **Chrono Time Stop (`V` — Monochrome World Freeze + Stacked Deferred Damage)**, **Live Weapon Damage & Combat Aim Studio (All-Weapons Catalog, Bag Forge, Aimbot & Aim Silent FOV Circle)**, **Transparent Quick Radial Wheel (`R`)**, **Arcane Gacha Spin Item Upgrader + Divine Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
 
 ## Persyaratan
 - **Minecraft Java Edition**: `1.21.1`
@@ -27,6 +27,7 @@ File `.jar` siap pakai akan dihasilkan di:
 ## Cara Membuka Menu di Dalam Game
 - Tekan tombol **`H`** untuk membuka **Dashboard Utama** *(bisa diubah kapan saja di `Options → Controls → Key Binds → Void Sovereign`)*,
 - Tekan tombol **`R`** sekali (tanpa ditahan) untuk membuka **Quick Radial Wheel**,
+- Tekan tombol **`V`** untuk **Hentikan / Jalankan Waktu Dunia (*Time Stop*)** setelah menyalakan toggle **Time Stop** di menu **Protection**,
 - Tekan tombol **`G`** untuk toggle **Fullbright**, **atau**
 - Ketik command **`/vs`**, **`/vs config`**, **`/hc`**, atau **`/hc:config`** *(langsung jalan di dunia **Hardcore** maupun **Survival** tanpa perlu menyalakan Cheat / Open to LAN!)*.
 - Shortcut cepat kustomisasi damage senjata di tangan: **`/vs damage <angka> [speed]`** atau **`/vs damage reset`**.

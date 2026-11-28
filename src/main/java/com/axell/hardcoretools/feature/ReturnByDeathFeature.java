@@ -480,6 +480,9 @@ public final class ReturnByDeathFeature {
 			return false;
 		}
 
+		// Ensure Time Stop never leaves ServerTickManager frozen during a 20s Return by Death rewind!
+		TimeStopFeature.forceResumeOnEmergency(server);
+
 		long actualTargetTick = chosenCheckpoint.tick;
 		double rewoundSec = Math.max(0.5D, Math.round(((nowTick - actualTargetTick) / 20.0D) * 10.0D) / 10.0D);
 

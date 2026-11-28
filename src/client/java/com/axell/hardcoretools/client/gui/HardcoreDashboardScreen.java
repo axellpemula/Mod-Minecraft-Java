@@ -36,6 +36,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
@@ -94,6 +95,9 @@ public class HardcoreDashboardScreen extends Screen {
 			new InfoEntry(icon("rbd"), "Return by Death", "Protection", 0xFFC86BFF,
 					"Mencegah kematian permanen Hardcore setelah Totem habis lalu memutar balik waktu dunia hingga -60 detik (koreografi 20 detik: karakter rebah & item terpental, kaca layar retak & pecah, lalu dunia monokrom fast-reverse memulihkan blok, mob, langit, posisi, dan isi tas).",
 					"Intercepts fatal Hardcore deaths when no Totems remain and rewinds up to 60 seconds of world state over a 20s sequence—restoring broken blocks, mobs, sky time, position, and full inventory."),
+			new InfoEntry(icon("timestop"), "Time Stop (Hentikan Waktu)", "Protection", 0xFF7DD3FC,
+					"Aktifkan toggle Time Stop di tab Protection lalu tekan keybind [V] di dalam game untuk menghentikan waktu dunia 100% dalam efek monokrom abu-abu kecuali dirimu. Semua pukulan/serangan ke mob akan menumpuk dan baru meledak mematikan target saat kamu menekan [V] lagi untuk menjalankan waktu normal.",
+					"Enable Time Stop in Protection then press [V] in-game to freeze 100% of world time in monochrome grayscale except yourself. Every attack against frozen entities stacks up and detonates simultaneously the instant you press [V] again to resume normal time."),
 			new InfoEntry(icon("veinminer"), "Vein Miner & Tree Capitator", "World & Ore", 0xFF38C9FF,
 					"Menghancurkan satu urat bijih sekaligus dengan Pickaxe dan menebang pohon alami utuh dengan Axe tanpa merusak bangunan kayu. Dilengkapi Auto-Collect, Auto-Smelt Ores, dan Instant Leaf Decay pintar.",
 					"Breaks connected ore veins in one swing with a Pickaxe and fells natural trees with an Axe while ignoring player builds. Includes Auto-Collect, Auto-Smelt Ores, and smart single-tree Instant Leaf Decay."),
@@ -483,7 +487,7 @@ public class HardcoreDashboardScreen extends Screen {
 		int swatchCy = panelY + 17;
 		CrimsonTheme.drawRoundedRect(ctx, swatchStartX - 3, panelY + 9, swatchGroupW, 16, 8.0F,
 				CrimsonTheme.withAlpha(CrimsonTheme.BG_INPUT, 210));
-		CrimsonTheme.drawRoundedOutline(ctx, swatchStartX - 3, panelY + 9, swatchGroupW, 16, 8.0F, 0.9F, CrimsonTheme.BORDER_SUBTLE);
+		CrimsonTheme.drawRoundedOutline(ctx, swatchStartX - 3, panelY + 9, swatchGroupW, 16, 8.0F, 0.55F, CrimsonTheme.BORDER_SUBTLE);
 
 		for (int ti = 0; ti < CrimsonTheme.PALETTES.length; ti++) {
 			final int themeIdx = ti;
@@ -520,6 +524,18 @@ public class HardcoreDashboardScreen extends Screen {
 					s.autoTotem ? 0x38FFB838 : CrimsonTheme.BG_INPUT,
 					s.autoTotem ? CrimsonTheme.GOLD : CrimsonTheme.BORDER_SUBTLE,
 					s.autoTotem ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_SECONDARY);
+		}
+
+		if (s.timeStopActive || s.timeStopEnabled) {
+			String tsChip = s.timeStopActive ? "⏸ TIME STOPPED" : "⏸ TIME STOP";
+			int tsw = this.textRenderer.getWidth(tsChip) + 10;
+			if (chipRight - (tsw + 4) >= minChipLeft) {
+				chipRight -= (tsw + 4);
+				CrimsonTheme.drawBadge(ctx, this.textRenderer, chipRight, chipY, tsChip,
+						s.timeStopActive ? 0x447DD3FC : CrimsonTheme.BG_INPUT,
+						s.timeStopActive ? 0xFF7DD3FC : CrimsonTheme.BORDER_SUBTLE,
+						s.timeStopActive ? 0xFFE0F2FE : CrimsonTheme.TEXT_SECONDARY);
+			}
 		}
 
 		if (s.returnByDeath) {
@@ -597,10 +613,10 @@ public class HardcoreDashboardScreen extends Screen {
 		int rowH = 20;
 		float animScreenY = sideY + this.animatedActiveTabRelY - (float) this.sidebarScroll;
 		CrimsonTheme.drawRoundedGradient(ctx, rowX, animScreenY, rowW, rowH, 5.0F,
-				CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON, 110),
-				CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_DARK, 175));
-		CrimsonTheme.drawRoundedOutline(ctx, rowX, animScreenY, rowW, rowH, 5.0F, 1.0F, CrimsonTheme.CRIMSON_BRIGHT);
-		CrimsonTheme.drawRoundedRect(ctx, rowX + 2.0F, animScreenY + 4.0F, 2.5F, rowH - 8.0F, 1.25F, CrimsonTheme.CRIMSON_BRIGHT);
+				CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON, 105),
+				CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_DARK, 165));
+		CrimsonTheme.drawRoundedOutline(ctx, rowX, animScreenY, rowW, rowH, 5.0F, 0.55F, CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_BRIGHT, 200));
+		CrimsonTheme.drawRoundedRect(ctx, rowX + 1.8F, animScreenY + 4.5F, 1.3F, rowH - 9.0F, 0.65F, CrimsonTheme.CRIMSON_BRIGHT);
 
 		for (int i = 0; i < TABS.size(); i++) {
 			final int idx = i;
@@ -622,7 +638,7 @@ public class HardcoreDashboardScreen extends Screen {
 
 			if (!active && hovered) {
 				CrimsonTheme.drawRoundedRect(ctx, rowX, tabY, rowW, rowH, 5.0F, CrimsonTheme.BG_CARD_HOVER);
-				CrimsonTheme.drawRoundedOutline(ctx, rowX, tabY, rowW, rowH, 5.0F, 0.9F, CrimsonTheme.BORDER_HOVER);
+				CrimsonTheme.drawRoundedOutline(ctx, rowX, tabY, rowW, rowH, 5.0F, 0.5F, CrimsonTheme.BORDER_HOVER);
 			}
 
 			// Render new 64x64 HD transparent icon cleanly at 15x15
@@ -663,7 +679,7 @@ public class HardcoreDashboardScreen extends Screen {
 			int ibH = 18;
 			boolean focused = this.primaryInput.isFocused();
 			CrimsonTheme.drawRoundedRect(ctx, ibX, ibY, ibW, ibH, 5.0F, CrimsonTheme.BG_INPUT);
-			CrimsonTheme.drawRoundedOutline(ctx, ibX, ibY, ibW, ibH, 5.0F, 1.0F,
+			CrimsonTheme.drawRoundedOutline(ctx, ibX, ibY, ibW, ibH, 5.0F, 0.55F,
 					focused ? CrimsonTheme.CRIMSON_BRIGHT : CrimsonTheme.BORDER_SUBTLE);
 			String glyph = (s.activeTab == 14) ? ">_" : ((s.activeTab == 4 && s.weaponStudioSubMode == 1) ? "⚔" : "⌕");
 			ctx.drawTextWithShadow(this.textRenderer, glyph, ibX + 6, ibY + 5,
@@ -718,9 +734,9 @@ public class HardcoreDashboardScreen extends Screen {
 			int ty = panelY + panelH - 23;
 			int border = s.toastOk ? CrimsonTheme.EMERALD : CrimsonTheme.CRIMSON_BRIGHT;
 			CrimsonTheme.drawRoundedRect(ctx, tx, ty, tw2, 17, 5.0F, CrimsonTheme.withAlpha(CrimsonTheme.BG_WINDOW, 246));
-			CrimsonTheme.drawRoundedOutline(ctx, tx, ty, tw2, 17, 5.0F, 1.0F, border);
-			CrimsonTheme.drawRoundedRect(ctx, tx + 2.5F, ty + 3.5F, 2.5F, 10.0F, 1.25F, border);
-			ctx.drawTextWithShadow(this.textRenderer, trimToWidth(s.toastText, tw2 - 14), tx + 8, ty + 5, CrimsonTheme.TEXT_PRIMARY);
+			CrimsonTheme.drawRoundedOutline(ctx, tx, ty, tw2, 17, 5.0F, 0.55F, CrimsonTheme.withAlpha(border, 200));
+			CrimsonTheme.drawRoundedRect(ctx, tx + 2.0F, ty + 4.0F, 1.3F, 9.0F, 0.65F, border);
+			ctx.drawTextWithShadow(this.textRenderer, trimToWidth(s.toastText, tw2 - 14), tx + 7, ty + 5, CrimsonTheme.TEXT_PRIMARY);
 		}
 
 		// 6. Held Item or Swatch Hover Tooltip
@@ -772,13 +788,13 @@ public class HardcoreDashboardScreen extends Screen {
 		CrimsonTheme.drawRoundedGradient(ctx, padX, curY, innerW, stageH, 6.0F,
 				CrimsonTheme.withAlpha(CrimsonTheme.BG_INPUT, 215),
 				CrimsonTheme.withAlpha(CrimsonTheme.BG_CARD, 225));
-		CrimsonTheme.drawRoundedOutline(ctx, padX, curY, innerW, stageH, 6.0F, 1.0F, CrimsonTheme.BORDER_SUBTLE);
+		CrimsonTheme.drawRoundedOutline(ctx, padX, curY, innerW, stageH, 6.0F, 0.55F, CrimsonTheme.BORDER_SUBTLE);
 
 		// Glowing Pedestal Aura Ring beneath player's feet
 		float pedCx = padX + innerW * 0.5F;
 		float pedCy = curY + stageH - 14.0F;
-		CrimsonTheme.drawRoundedRect(ctx, pedCx - innerW * 0.34F, pedCy, innerW * 0.68F, 4.0F, 2.0F,
-				CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_BRIGHT, 78));
+		CrimsonTheme.drawRoundedRect(ctx, pedCx - innerW * 0.34F, pedCy, innerW * 0.68F, 2.5F, 1.25F,
+				CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_BRIGHT, 68));
 
 		MinecraftClient mc = MinecraftClient.getInstance();
 		if (mc.player != null) {
@@ -797,7 +813,7 @@ public class HardcoreDashboardScreen extends Screen {
 
 		// 3. Live Health & XP Mini Vitals Card
 		CrimsonTheme.drawRoundedRect(ctx, padX, curY, innerW, 36, 5.0F, CrimsonTheme.BG_CARD);
-		CrimsonTheme.drawRoundedOutline(ctx, padX, curY, innerW, 36, 5.0F, 0.9F, CrimsonTheme.BORDER_SUBTLE);
+		CrimsonTheme.drawRoundedOutline(ctx, padX, curY, innerW, 36, 5.0F, 0.55F, CrimsonTheme.BORDER_SUBTLE);
 
 		float maxHp = Math.max(1.0F, s.maxHealth);
 		float hpRatio = Math.max(0.0F, Math.min(1.0F, s.health / maxHp));
@@ -911,6 +927,26 @@ public class HardcoreDashboardScreen extends Screen {
 				s.returnByDeathCooldown, 0, 300, clipTop, clipBot, mx, my,
 				v -> s.returnByDeathCooldown = v,
 				v -> sendIntAction("set_rbd_cooldown", v));
+
+		String tsKey = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.timeStopKey, "V");
+		String tsHdr = s.timeStopActive
+				? ("⏸ TIME STOP  ·  WORLD FROZEN [" + tsKey + "]")
+				: ("⏸ TIME STOP  ·  KEYBIND [" + tsKey + "]");
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y + 4, w, tsHdr);
+		y += 22;
+		y = drawToggleCard(ctx, x, y, w, "Time Stop",
+				s.timeStopEnabled, clipTop, clipBot, mx, my,
+				() -> sendAction("toggle_timestop_enabled", new JsonObject()));
+
+		CrimsonTheme.drawCard(ctx, x, y, w, 18, false, s.timeStopActive ? 0xFF7DD3FC : 0);
+		String tsHint = s.timeStopActive
+				? ("⏸ World Frozen — Press [" + tsKey + "] in-game to resume time & detonate stacked hits")
+				: (s.timeStopEnabled
+						? ("Ready · Press [" + tsKey + "] in-game to freeze/resume world time & stack damage")
+						: ("Turn ON above, then press [" + tsKey + "] in-game (Controls → Void Sovereign)"));
+		ctx.drawTextWithShadow(textRenderer, trimToWidth(tsHint, w - 14), x + 7, y + 5,
+				s.timeStopActive ? 0xFFBAE6FD : (s.timeStopEnabled ? CrimsonTheme.TEXT_SECONDARY : CrimsonTheme.TEXT_MUTED));
+		y += 22;
 		return y;
 	}
 
@@ -1902,7 +1938,7 @@ public class HardcoreDashboardScreen extends Screen {
 		int pillY = y + 39;
 		int pillW = w - 16;
 		CrimsonTheme.drawRoundedRect(ctx, pillX, pillY, pillW, 14, 4.0F, CrimsonTheme.BG_INPUT);
-		CrimsonTheme.drawRoundedOutline(ctx, pillX, pillY, pillW, 14, 4.0F, 0.9F, CrimsonTheme.BORDER_SUBTLE);
+		CrimsonTheme.drawRoundedOutline(ctx, pillX, pillY, pillW, 14, 4.0F, 0.5F, CrimsonTheme.BORDER_SUBTLE);
 		String footerTxt;
 		int footerColor;
 		if (s.upgraderHasResult && s.upgraderResultRevealed) {
@@ -1979,16 +2015,16 @@ public class HardcoreDashboardScreen extends Screen {
 		String rollBtnLabel;
 		int rollBtnColor;
 		if (spinning) {
-			rollBtnLabel = "✦ Ritual Channeling...";
+			rollBtnLabel = "✦ Spinning Gacha Reel...";
 			rollBtnColor = 0xFF3E1F47;
 		} else if (fullPityReady) {
-			rollBtnLabel = "☀ UNLEASH DIVINE PITY 100% WIN!";
+			rollBtnLabel = "☀ SPIN 100% DIVINE PITY!";
 			rollBtnColor = 0xFFB87414;
 		} else if (softPityActive) {
-			rollBtnLabel = "🔥 SUMMON ALTAR " + liveChance + "% · SOFT PITY";
+			rollBtnLabel = "🔥 SPIN GACHA " + liveChance + "% · SOFT PITY";
 			rollBtnColor = 0xFFA3264E;
 		} else {
-			rollBtnLabel = "✦ SUMMON ALTAR " + liveChance + "% CHANCE";
+			rollBtnLabel = "✦ SPIN GACHA · " + liveChance + "% CHANCE";
 			rollBtnColor = 0xFF8C1D58;
 		}
 		final ItemUpgraderFeature.BagOfferSlot chosenOffer = activeOffer;
@@ -2296,14 +2332,42 @@ public class HardcoreDashboardScreen extends Screen {
 		}
 	}
 
+	private static long mixGachaSeed(long baseSeed, long salt) {
+		long z = baseSeed + salt * 0x9E3779B97F4A7C15L;
+		z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+		z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+		return z ^ (z >>> 31);
+	}
+
+	private static boolean isGachaWinSlot(int slotIdx, int landIdx, long spinSeed, ClientStateSnapshot s) {
+		if (s.upgraderStartedWithFullPity) {
+			return true;
+		}
+		if (slotIdx == landIdx) {
+			if (s.upgraderHasResult) {
+				return s.upgraderWon;
+			}
+			long roll = Math.floorMod(mixGachaSeed(spinSeed, slotIdx), 10000L);
+			return roll < Math.round(s.upgraderChance * 100.0);
+		}
+		// Exciting near-miss jackpot card occasionally next to landing slot on failed pulls
+		if (slotIdx == landIdx - 1 && s.upgraderHasResult && !s.upgraderWon
+				&& Math.floorMod(mixGachaSeed(spinSeed, 777L), 3L) == 0L) {
+			return true;
+		}
+		double visualRate = Math.max(0.16, Math.min(0.86, s.upgraderChance / 100.0));
+		long roll = Math.floorMod(mixGachaSeed(spinSeed, slotIdx * 31L + 7L), 10000L);
+		return roll < Math.round(visualRate * 10000.0);
+	}
+
 	private void renderRitualGachaModal(DrawContext ctx, ClientStateSnapshot s, int mx, int my) {
 		long now = System.currentTimeMillis();
 		long elapsedMs = Math.max(0L, now - s.upgraderSpinStartMs);
 		boolean spinning = now < s.upgraderSpinEndMs || !s.upgraderHasResult;
 		processRitualRevealIfReady(s, now);
 
-		int stageW = Math.min(336, this.width - 20);
-		int stageH = Math.min(244, this.height - 14);
+		int stageW = Math.min(368, Math.max(288, this.width - 24));
+		int stageH = Math.min(224, Math.max(198, this.height - 16));
 		int stageX = (this.width - stageW) / 2;
 		int stageY = (this.height - stageH) / 2;
 
@@ -2313,366 +2377,326 @@ public class HardcoreDashboardScreen extends Screen {
 				? Math.max(0.0, (now - s.upgraderRevealStartMs) / 1000.0)
 				: 0.0;
 
-		boolean goldenPityRitual = s.upgraderStartedWithFullPity;
+		boolean goldenPitySpin = s.upgraderStartedWithFullPity;
 
-		int hdrH = 38;
-		int footerH = 60;
-		int arenaTop = stageY + hdrH + 2;
-		int arenaBot = stageY + stageH - footerH;
-		float cx = stageX + stageW * 0.5F;
-		float cy = (arenaTop + arenaBot) * 0.5F;
-		float maxR = Math.max(30.0F, Math.min(52.0F, (arenaBot - arenaTop) * 0.5F - 7.0F));
+		// 1. Clean Translucent Backdrop Dim + Sleek Rounded Void Sovereign Modal Panel
+		ctx.fill(0, 0, this.width, this.height, 0x92040308);
+		CrimsonTheme.drawPanel(ctx, stageX, stageY, stageW, stageH);
 
-		// 1. Opaque Deep Astral Sanctuary Curtain (veils HUD/inventory completely — zero spoilers or clutter!)
-		ctx.fillGradient(0, 0, this.width, this.height, 0xFC05020A, 0xFF0C0412);
-
-		// 2. Stage Window Frame & Spacious Header (Golden Sovereign Aura ONLY when 100% Pity was already active before pull!)
-		int frameBorder = spinning
-				? (goldenPityRitual ? CrimsonTheme.GOLD : 0xFFB86BFF)
+		int accentBorder = spinning
+				? (goldenPitySpin ? CrimsonTheme.GOLD : CrimsonTheme.AMETHYST)
 				: (s.upgraderWon ? (s.upgraderPityTriggered ? CrimsonTheme.GOLD : CrimsonTheme.EMERALD) : CrimsonTheme.CRIMSON_BRIGHT);
-		ctx.fill(stageX - 4, stageY - 4, stageX + stageW + 4, stageY + stageH + 4, 0x88000000);
-		ctx.fill(stageX, stageY, stageX + stageW, stageY + stageH, 0xFA0B0611);
-		ctx.drawBorder(stageX, stageY, stageW, stageH, frameBorder);
-		ctx.drawBorder(stageX + 2, stageY + 2, stageW - 4, stageH - 4, goldenPityRitual && spinning ? 0x66B88228 : 0x445E2D73);
+		CrimsonTheme.drawRoundedOutline(ctx, stageX, stageY, stageW, stageH, 8.0F, 0.65F, CrimsonTheme.withAlpha(accentBorder, 185));
 
-		int hdrTop = spinning ? (goldenPityRitual ? 0xFF33210A : 0xFF1F0C29) : (s.upgraderWon ? 0xFF0D2B1E : 0xFF2B0B15);
-		int hdrBot = spinning ? (goldenPityRitual ? 0xFF171006 : 0xFF100716) : (s.upgraderWon ? 0xFF091611 : 0xFF14070C);
-		ctx.fillGradient(stageX + 1, stageY + 1, stageX + stageW - 1, stageY + hdrH, hdrTop, hdrBot);
-		ctx.fill(stageX + 1, stageY + hdrH, stageX + stageW - 1, stageY + hdrH + 1, frameBorder);
+		// Resolve Target Preview Stack for Roulette Cards
+		Identifier resTargetId = Identifier.tryParse(
+				(s.upgraderResultTargetId != null && !s.upgraderResultTargetId.isEmpty()) ? s.upgraderResultTargetId : s.upgraderTargetId);
+		Item targetItemObj = (resTargetId != null && Registries.ITEM.containsId(resTargetId))
+				? Registries.ITEM.get(resTargetId)
+				: Items.NETHERITE_INGOT;
+		ItemStack targetCardStack = ItemUpgraderFeature.createRewardPreview(
+				s.upgraderSacrificeStack,
+				targetItemObj,
+				!s.upgraderSacrificeStack.isEmpty() && !s.upgraderSacrificeStack.getEnchantments().isEmpty(),
+				s.bypassEnchantConflicts
+		);
+		ItemStack essenceCardStack = new ItemStack(Items.EXPERIENCE_BOTTLE);
 
+		// 2. Clean Header + Top-Right Close Button
 		String stageTitle;
 		int titleColor;
 		String stageSub;
 		if (spinning) {
-			if (goldenPityRitual) {
-				stageTitle = "☀ SOVEREIGN PITY INVOCATION ☀";
+			if (goldenPitySpin) {
+				stageTitle = "☀ DIVINE PITY GACHA SPIN";
 				titleColor = CrimsonTheme.GOLD;
-				stageSub = "100% Divine Guarantee Active · Offering " + s.upgraderSacrificedAmount + "x " + s.upgraderSacrificeName;
+				stageSub = "100% Guaranteed Jackpot  ·  " + s.upgraderSacrificedAmount + "x " + s.upgraderSacrificeName + " ➔ " + s.upgraderTargetName;
 			} else {
-				stageTitle = "✦ ARCANE ALTAR RITUAL ✦";
+				stageTitle = "✦ ARCANE GACHA ROULETTE";
 				titleColor = CrimsonTheme.TEXT_PRIMARY;
-				stageSub = "Offering " + s.upgraderSacrificedAmount + "x " + s.upgraderSacrificeName + "  ·  Rate: " + s.upgraderChance + "%";
+				stageSub = s.upgraderSacrificedAmount + "x " + s.upgraderSacrificeName + " ➔ " + s.upgraderTargetName + "  ·  Win Rate: " + s.upgraderChance + "%";
 			}
 		} else if (s.upgraderWon) {
-			stageTitle = s.upgraderPityTriggered ? "☀ DIVINE PITY JACKPOT! ☀" : "✦ DIVINE FORGE JACKPOT! ✦";
+			stageTitle = s.upgraderPityTriggered ? "☀ DIVINE PITY JACKPOT!" : "✦ JACKPOT FORGED!";
 			titleColor = CrimsonTheme.GOLD;
-			stageSub = s.upgraderPityTriggered ? "100% Arcane Pity Consumed · Reset to 0%" : "Sacred Transmutation Complete!";
+			String enchTag = s.upgraderInheritedEnchants > 0 ? (" · +" + s.upgraderInheritedEnchants + " Enchants Inherited") : "";
+			stageSub = "Obtained " + s.upgraderTargetName + enchTag;
 		} else {
-			stageTitle = (s.upgraderPityAfter >= ItemUpgraderFeature.MAX_PITY)
-					? "☀ PITY MAXED — NEXT ROLL 100%! ☀"
-					: "✖ ALTAR ESSENCE SHATTERED ✖";
-			titleColor = (s.upgraderPityAfter >= ItemUpgraderFeature.MAX_PITY) ? CrimsonTheme.GOLD : CrimsonTheme.CRIMSON_BRIGHT;
-			stageSub = "Crystal Core Fractured into XP & Arcane Pity";
+			boolean maxed = s.upgraderPityAfter >= ItemUpgraderFeature.MAX_PITY;
+			stageTitle = maxed ? "☀ PITY MAXED — 100% READY!" : "✖ ESSENCE EXTRACTED";
+			titleColor = maxed ? CrimsonTheme.GOLD : CrimsonTheme.CRIMSON_BRIGHT;
+			stageSub = "Converted into +" + s.upgraderXpRefund + " XP & +" + s.upgraderPityGain + "% Arcane Pity";
 		}
-		drawCenteredText(ctx, stageTitle, stageX + stageW / 2, stageY + 8, titleColor);
-		drawCenteredText(ctx, trimToWidth(stageSub, stageW - 24), stageX + stageW / 2, stageY + 22, CrimsonTheme.TEXT_SECONDARY);
 
-		// Divider line above footer
-		ctx.fill(stageX + 10, arenaBot, stageX + stageW - 10, arenaBot + 1, 0x445E2D73);
+		drawCenteredText(ctx, stageTitle, stageX + stageW / 2, stageY + 7, titleColor);
+		drawCenteredText(ctx, trimToWidth(stageSub, stageW - 48), stageX + stageW / 2, stageY + 19, CrimsonTheme.TEXT_SECONDARY);
 
-		// 3. Silky-Smooth OpenGL Floating-Point Vector Additive Glow Stage
-		beginAdditiveGlow(ctx);
-		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+		if (!spinning) {
+			int xBtnX = stageX + stageW - 23;
+			int xBtnY = stageY + 6;
+			boolean hovX = inRect(mx, my, xBtnX, xBtnY, 16, 16);
+			CrimsonTheme.drawSubtleButton(ctx, this.textRenderer, xBtnX, xBtnY, 16, 16, "✕", false, hovX);
+			clickZones.add(new ClickZone(xBtnX, xBtnY, 16, 16, () -> closeRitualModal(s)));
+		}
+
+		ctx.fill(stageX + 12, stageY + 32, stageX + stageW - 12, stageY + 33, CrimsonTheme.withAlpha(CrimsonTheme.BORDER_SUBTLE, 115));
+
+		// 3. Strictly Clipped Center Viewport (Gacha Spin Reel while spinning; Contained Pedestal on reveal)
+		int viewX = stageX + 14;
+		int viewY = stageY + 39;
+		int viewW = stageW - 28;
+		int viewH = Math.max(74, stageH - 136);
+		float viewCx = viewX + viewW * 0.5F;
+		float viewCy = viewY + viewH * 0.5F;
+
+		CrimsonTheme.drawRoundedGradient(ctx, viewX, viewY, viewW, viewH, 6.0F, 0xF408060E, 0xF60C0814);
+		CrimsonTheme.drawRoundedOutline(ctx, viewX, viewY, viewW, viewH, 6.0F, 0.6F,
+				CrimsonTheme.withAlpha(accentBorder, spinning ? 145 : 195));
 
 		if (spinning) {
-			// Gentle, musical 9-step rising Amethyst chime across the 4.0s build-up
-			int chimeStep = (int) (chargeT * 9.0);
-			if (chimeStep != s.upgraderLastTickBucket && chargeT < 0.93) {
-				s.upgraderLastTickBucket = chimeStep;
-				float pitch = (goldenPityRitual ? 0.82F : 0.65F) + (float) (chargeT * 1.05F);
-				MinecraftClient.getInstance().getSoundManager().play(
-						PositionedSoundInstance.master(SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, pitch));
-			} else if (chargeT >= 0.93 && s.upgraderLastTickBucket != 99) {
-				s.upgraderLastTickBucket = 99;
-				MinecraftClient.getInstance().getSoundManager().play(
-						PositionedSoundInstance.master(SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, 1.35F));
-			}
+			final int totalCards = 44;
+			final int landIndex = 34;
+			final int cardW = 50;
+			final int cardH = Math.min(64, viewH - 14);
+			final int cardGap = 6;
+			final int stride = cardW + cardGap;
 
-			double unfold = easeOutCubic(Math.min(1.0, chargeT / 0.28));
-			double implode = chargeT <= 0.74 ? 1.0
-					: (chargeT < 0.92
-							? (1.0 - 0.55 * easeInOutSine((chargeT - 0.74) / 0.18))
-							: (0.45 * (1.0 - easeInCubic((chargeT - 0.92) / 0.08))));
+			long spinSeed = s.upgraderSpinStartMs ^ (Double.doubleToLongBits(s.upgraderChance) * 0x5DEECE66DL);
+			double subCardJitter = (((Math.floorMod(mixGachaSeed(spinSeed, 999L), 10000L) / 10000.0) - 0.5) * 24.0);
 
-			float curOuterR = (float) (maxR * unfold * implode);
-			float curHexR = curOuterR * 0.71F;
+			double startPx = 2.0 * stride;
+			double endPx = landIndex * stride + subCardJitter;
+			double ease = 1.0 - Math.pow(1.0 - chargeT, 4.25);
+			double scrollPx = startPx + (endPx - startPx) * ease;
 
-			double accelPhase = Math.pow(chargeT, 2.35) * 14.5;
-			double rotOuter = (elapsedMs * 0.0009) + accelPhase;
-			double rotInner = -(elapsedMs * 0.0012) - accelPhase * 1.25;
-
-			int outerRingRgb = goldenPityRitual ? 0xFFD859 : 0xC86BFF;
-			int innerRingRgb = goldenPityRitual ? 0xFFA438 : 0x38C9FF;
-			int hexRgb = goldenPityRitual ? 0xFFF2AD : 0xFFBC3B;
-			int nebulaCenter = goldenPityRitual ? 0x45FFB838 : 0x389B4DFF;
-			int nebulaEdge = goldenPityRitual ? 0x003D2205 : 0x00240A40;
-
-			float nebulaR = (float) ((maxR + 24.0F) * unfold * (chargeT > 0.92 ? implode * 2.0 : 1.0));
-			if (nebulaR > 2.0F) {
-				drawSmoothRadialGlow(mat, cx, cy, nebulaR, nebulaCenter, nebulaEdge);
-			}
-
-			if (curOuterR > 3.0F) {
-				int ringAlpha = (int) Math.round(195 * unfold);
-				drawSmoothGlowRing(mat, cx, cy, curOuterR, 0.85F, 3.8F, withAlpha(outerRingRgb, ringAlpha));
-				drawSmoothGlowRing(mat, cx, cy, curHexR, 0.65F, 2.6F, withAlpha(innerRingRgb, (int) (ringAlpha * 0.78)));
-				drawSmoothHexagram(mat, cx, cy, curHexR, rotInner, 0.85F, withAlpha(hexRgb, (int) (ringAlpha * 0.85)));
-
-				for (int k = 0; k < 6; k++) {
-					double ang = rotOuter + k * (Math.PI / 3.0);
-					float x1 = cx + (float) (Math.cos(ang) * (curHexR + 2.0F));
-					float y1 = cy + (float) (Math.sin(ang) * (curHexR + 2.0F));
-					float x2 = cx + (float) (Math.cos(ang) * (curOuterR - 1.5F));
-					float y2 = cy + (float) (Math.sin(ang) * (curOuterR - 1.5F));
-					drawSmoothGlowSegment(mat, x1, y1, x2, y2, 0.8F, withAlpha(0xFFD86B, (int) (ringAlpha * 0.8)));
+			// Mechanical Roulette Tick Sound each time a new card crosses the center needle
+			int needleCardIdx = (int) Math.round(scrollPx / stride);
+			if (needleCardIdx != s.upgraderLastTickBucket && needleCardIdx >= 2 && needleCardIdx <= landIndex) {
+				s.upgraderLastTickBucket = needleCardIdx;
+				boolean winPassing = isGachaWinSlot(needleCardIdx, landIndex, spinSeed, s);
+				var sm = MinecraftClient.getInstance().getSoundManager();
+				float tickPitch = 0.92F + (float) (chargeT * 0.52F);
+				SoundEvent clickEv = Registries.SOUND_EVENT.get(Identifier.ofVanilla("ui.button.click"));
+				if (clickEv != null) {
+					sm.play(PositionedSoundInstance.master(clickEv, tickPitch, 0.26F));
 				}
-			}
-
-			// 8 Silky Curved Spiral Energy Ribbons (Act II & III: 0.20 .. 0.94)
-			if (chargeT > 0.20 && chargeT < 0.94) {
-				double p = (chargeT - 0.20) / 0.74;
-				float ribbonFade = (float) (p < 0.15 ? (p / 0.15) : (p > 0.85 ? (1.0 - p) / 0.15 : 1.0));
-				for (int i = 0; i < 8; i++) {
-					double wave = ((p * 2.2) + (i * 0.125)) % 1.0;
-					float headR = (float) ((1.0 - easeInQuad(wave)) * (curOuterR + 8.0F) + 2.5F);
-					double headAng = (i * (Math.PI * 2.0 / 8.0)) + rotOuter * 1.35 + wave * 2.1;
-					int colHead = goldenPityRitual ? 0xFFFFF3B0 : ((i % 2 == 0) ? 0xFFFFDF75 : 0xFFE28BFF);
-					int colTail = goldenPityRitual ? 0xFFFF9E2C : ((i % 2 == 0) ? 0xFFD86BFF : 0xFF38C9FF);
-					int alpha = (int) Math.round(215 * ribbonFade * Math.sin(wave * Math.PI));
-					if (alpha > 8) {
-						drawSmoothSpiralComet(mat, cx, cy, headAng, headR, 14.0F, 0.68,
-								withAlpha(colHead, alpha), withAlpha(colTail, 0));
+				if (winPassing) {
+					SoundEvent chimeEv = Registries.SOUND_EVENT.get(Identifier.ofVanilla("block.amethyst_block.chime"));
+					if (chimeEv != null) {
+						sm.play(PositionedSoundInstance.master(chimeEv, 1.05F + (float) (chargeT * 0.35F), 0.22F));
 					}
 				}
 			}
 
-			float coreGlowR;
-			float starScale;
-			if (chargeT < 0.28) {
-				coreGlowR = (float) (12.0 + unfold * 6.0);
-				starScale = (float) (4.0 * unfold);
-			} else if (chargeT < 0.92) {
-				double grow = (chargeT - 0.28) / 0.64;
-				float pulse = (float) (Math.sin(elapsedMs * (0.008 + grow * 0.018)) * 2.5);
-				coreGlowR = (float) (18.0 + grow * 20.0 + pulse);
-				starScale = (float) (4.0 + grow * 11.0);
-			} else {
-				double imp = (chargeT - 0.92) / 0.08;
-				coreGlowR = (float) (38.0 * (1.0 - imp * 0.72));
-				starScale = (float) (15.0 * (1.0 - imp * 0.55));
-			}
+			ctx.enableScissor(viewX + 1, viewY + 1, viewX + viewW - 1, viewY + viewH - 1);
 
-			float orbOffX = 0.0F;
-			float orbOffY = 0.0F;
-			if (chargeT > 0.74 && chargeT < 0.94) {
-				float vib = (float) (((chargeT - 0.74) / 0.20) * 1.35);
-				orbOffX = (float) (Math.sin(elapsedMs * 0.085) * vib);
-				orbOffY = (float) (Math.cos(elapsedMs * 0.105) * vib);
-			}
+			// Subtle center rail line behind scrolling cards
+			int railY = Math.round(viewCy);
+			ctx.fill(viewX + 4, railY, viewX + viewW - 4, railY + 1, 0x24FFFFFF);
 
-			int coreOuterCol = goldenPityRitual ? 0xDDFFC94D : 0xCCDA8FFF;
-			int coreOuterEdge = goldenPityRitual ? 0x00A8550A : 0x006A1FB8;
-			int coreInnerEdge = goldenPityRitual ? 0x00FFD859 : 0x00D86BFF;
-			drawSmoothRadialGlow(mat, cx + orbOffX, cy + orbOffY, coreGlowR, coreOuterCol, coreOuterEdge);
-			drawSmoothRadialGlow(mat, cx + orbOffX, cy + orbOffY, coreGlowR * 0.52F, 0xEEFFF4D2, coreInnerEdge);
-			drawCrystalPrismStar(mat, cx + orbOffX, cy + orbOffY, starScale, elapsedMs * 0.0032, 0xFFFFF8E7, coreInnerEdge);
-
-			endAdditiveGlow();
-
-			// 3D Sacrifice Item: Levitates cleanly in Act I (0..0.28), then smoothly spirals & shrinks into Core in Act II (0.28..0.74)
-			if (!s.upgraderSacrificeStack.isEmpty() && chargeT < 0.74) {
-				float itemScale;
-				float tiltDeg;
-				float floatY;
-				if (chargeT < 0.28) {
-					double u = easeOutCubic(chargeT / 0.28);
-					itemScale = (float) (0.75 + 1.10 * u);
-					tiltDeg = (float) (Math.sin(elapsedMs * 0.004) * 4.0);
-					floatY = (float) (-Math.sin(u * Math.PI * 0.5) * 3.0 + Math.sin(elapsedMs * 0.005) * 1.8);
-				} else {
-					double absorb = easeInOutCubic((chargeT - 0.28) / 0.46);
-					itemScale = (float) (1.85 * (1.0 - absorb));
-					tiltDeg = (float) (absorb * absorb * 380.0);
-					floatY = (float) ((1.0 - absorb) * -2.0);
+			int cardTop = Math.round(viewCy - cardH * 0.5F);
+			for (int i = 0; i < totalCards; i++) {
+				float cardCx = viewCx + (float) (i * stride - scrollPx);
+				if (cardCx + cardW * 0.5F < viewX - 4 || cardCx - cardW * 0.5F > viewX + viewW + 4) {
+					continue;
 				}
-				if (itemScale > 0.06F) {
-					drawScaledItemCentered(ctx, s.upgraderSacrificeStack, cx, cy + floatY, itemScale, tiltDeg);
-					ctx.draw();
+				boolean winCard = isGachaWinSlot(i, landIndex, spinSeed, s);
+				float distNorm = Math.min(1.0F, Math.abs(cardCx - viewCx) / (float) stride);
+				float focus = 1.0F - distNorm;
+
+				int cx0 = Math.round(cardCx - cardW * 0.5F);
+				int cy0 = Math.round(cardTop - focus * 2.0F);
+
+				int topBg = winCard
+						? CrimsonTheme.lerpColor(0xEE22190A, 0xF636260C, focus)
+						: CrimsonTheme.lerpColor(0xEE120F1A, 0xF21B1626, focus);
+				int botBg = winCard ? 0xF4110D06 : 0xF40A0810;
+				int rimCol = winCard
+						? CrimsonTheme.withAlpha(CrimsonTheme.GOLD, (int) (145 + 105 * focus))
+						: CrimsonTheme.withAlpha(focus > 0.55F ? CrimsonTheme.AMETHYST : CrimsonTheme.BORDER_SUBTLE, (int) (130 + 90 * focus));
+				int stripCol = winCard ? CrimsonTheme.GOLD : 0xFF7B5EA7;
+
+				CrimsonTheme.drawRoundedGradient(ctx, cx0, cy0, cardW, cardH, 4.5F, topBg, botBg);
+				CrimsonTheme.drawRoundedOutline(ctx, cx0, cy0, cardW, cardH, 4.5F, 0.55F, rimCol);
+				CrimsonTheme.drawRoundedRect(ctx, cx0 + 4, cy0 + cardH - 3.2F, cardW - 8, 1.6F, 0.8F, CrimsonTheme.withAlpha(stripCol, 220));
+
+				if (winCard) {
+					CrimsonTheme.drawCircle(ctx, cardCx, cy0 + cardH * 0.42F, 14.0F + focus * 2.5F,
+							CrimsonTheme.withAlpha(CrimsonTheme.GOLD, (int) (26 + 34 * focus)));
 				}
+
+				float iconScale = (winCard ? 1.32F : 1.18F) + focus * 0.12F;
+				drawScaledItemCentered(ctx, winCard ? targetCardStack : essenceCardStack,
+						cardCx, cy0 + cardH * 0.41F, iconScale, 0.0F);
+				ctx.draw();
+
+				String tag = winCard ? "JACKPOT" : "+XP";
+				int tagCol = winCard ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_MUTED;
+				ctx.getMatrices().push();
+				float tagScale = 0.66F;
+				float tw = this.textRenderer.getWidth(tag) * tagScale;
+				ctx.getMatrices().translate(cardCx - tw * 0.5F, cy0 + cardH - 11.0F, 0.0F);
+				ctx.getMatrices().scale(tagScale, tagScale, 1.0F);
+				ctx.drawTextWithShadow(this.textRenderer, tag, 0, 0, tagCol);
+				ctx.getMatrices().pop();
 			}
+
+			// Soft Left & Right Edge Vignettes inside Scissored Reel
+			int vigW = 28;
+			for (int vx = 0; vx < vigW; vx++) {
+				int a = (int) Math.round(215 * Math.pow(1.0 - (vx / (double) vigW), 1.7));
+				int col = (a << 24) | 0x07050C;
+				ctx.fill(viewX + 1 + vx, viewY + 1, viewX + 2 + vx, viewY + viewH - 1, col);
+				ctx.fill(viewX + viewW - 2 - vx, viewY + 1, viewX + viewW - 1 - vx, viewY + viewH - 1, col);
+			}
+
+			ctx.disableScissor();
+
+			// Crisp Center Laser Needle & Pointer Caps
+			int needleCol = goldenPitySpin ? CrimsonTheme.GOLD : 0xFFFFDF75;
+			int needleX = Math.round(viewCx);
+			ctx.fill(needleX - 2, viewY + 2, needleX + 3, viewY + viewH - 2, CrimsonTheme.withAlpha(needleCol, 34));
+			ctx.fill(needleX, viewY + 1, needleX + 1, viewY + viewH - 1, CrimsonTheme.withAlpha(needleCol, 235));
+			CrimsonTheme.drawRoundedRect(ctx, viewCx - 4.5F, viewY - 1.5F, 9.0F, 3.5F, 1.5F, needleCol);
+			CrimsonTheme.drawRoundedRect(ctx, viewCx - 4.5F, viewY + viewH - 2.0F, 9.0F, 3.5F, 1.5F, needleCol);
 		} else {
-			// ==================== ACT IV: CLIMAX EXPLOSION & REVEAL ====================
+			// ==================== STRICTLY CLIPPED REVEAL PEDESTAL ====================
+			ctx.enableScissor(viewX + 1, viewY + 1, viewX + viewW - 1, viewY + viewH - 1);
+
+			beginAdditiveGlow(ctx);
+			Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
+			float auraR = Math.min(36.0F, viewH * 0.44F);
+			double slowRot = now * 0.0008;
+
 			if (s.upgraderWon) {
-				double slowRot = now * 0.00075;
+				drawSmoothRadialGlow(mat, viewCx, viewCy - 2.0F, auraR + 10.0F, 0x4423D17B, 0x000A3822);
+				drawSmoothRadialGlow(mat, viewCx, viewCy - 2.0F, auraR * 0.82F, 0x78FFD859, 0x0023D17B);
+				drawSmoothGlowRing(mat, viewCx, viewCy - 2.0F, auraR * 0.78F, 0.55F, 2.2F, 0x99FFE074);
 
-				// Smooth Volumetric Emerald-Gold Aura + 12 Rotating Sunburst God-Rays
-				drawSmoothRadialGlow(mat, cx, cy, maxR + 28.0F, 0x5523D17B, 0x000A3822);
-				drawSmoothRadialGlow(mat, cx, cy, maxR * 0.85F, 0x99FFD859, 0x0023D17B);
-				drawSmoothSunburstRays(mat, cx, cy, 12, 6.0F, maxR + 18.0F, 0.115F, slowRot, 0x88FFE074);
-
-				// Crisp Sacred Golden-Emerald Halo Ring
-				drawSmoothGlowRing(mat, cx, cy, maxR * 0.92F, 0.85F, 3.6F, 0xBB23D17B);
-				drawSmoothHexagram(mat, cx, cy, maxR * 0.66F, -slowRot * 1.15, 0.70F, 0x77FFD859);
-
-				// Expanding Silky Shockwave Ring (0.00s .. 0.78s)
-				if (revSec < 0.78) {
-					double p = revSec / 0.78;
-					float swR = (float) (6.0 + easeOutCubic(p) * (maxR + 46.0));
-					int swAlpha = (int) Math.round(240 * Math.pow(1.0 - p, 1.6));
-					drawSmoothGlowRing(mat, cx, cy, swR, 1.2F, 6.0F, withAlpha(0xFFE680, swAlpha));
+				if (revSec < 0.65) {
+					double p = revSec / 0.65;
+					float swR = (float) (8.0 + easeOutCubic(p) * (auraR + 24.0));
+					int swAlpha = (int) Math.round(190 * Math.pow(1.0 - p, 1.7));
+					drawSmoothGlowRing(mat, viewCx, viewCy - 2.0F, swR, 0.75F, 3.0F, withAlpha(0xFFE680, swAlpha));
 				}
 
-				// 8 Gently Floating Golden-Emerald Starlight Orbs
-				for (int i = 0; i < 8; i++) {
-					double orbAng = slowRot * 1.8 + i * (Math.PI * 2.0 / 8.0);
-					float orbR = (float) (maxR * 0.72 + Math.sin(now * 0.003 + i * 1.4) * 5.5);
-					float ox = cx + (float) (Math.cos(orbAng) * orbR);
-					float oy = cy + (float) (Math.sin(orbAng) * orbR);
-					int c = (i % 2 == 0) ? 0xDDFFE885 : 0xDD4DFFAA;
-					drawSmoothRadialGlow(mat, ox, oy, 5.2F, c, 0x00000000);
+				for (int i = 0; i < 6; i++) {
+					double orbAng = slowRot * 1.6 + i * (Math.PI * 2.0 / 6.0);
+					float orbR = auraR * 0.76F + (float) Math.sin(now * 0.003 + i) * 3.0F;
+					float ox = viewCx + (float) (Math.cos(orbAng) * orbR);
+					float oy = (viewCy - 2.0F) + (float) (Math.sin(orbAng) * orbR * 0.72);
+					drawSmoothRadialGlow(mat, ox, oy, 3.6F, (i % 2 == 0) ? 0xCCFFE885 : 0xCC4DFFAA, 0x00000000);
 				}
-
 				endAdditiveGlow();
 
-				// Elastic Spring Pop-Out 2.30x 3D Target Item (0.0x -> 2.56x -> 2.30x over 0.52s)
 				float popScale;
-				if (revSec < 0.52) {
-					double u = revSec / 0.52;
+				if (revSec < 0.45) {
+					double u = revSec / 0.45;
 					double c1 = 1.70158;
 					double c3 = c1 + 1.0;
 					double easeBack = 1.0 + c3 * Math.pow(u - 1.0, 3.0) + c1 * Math.pow(u - 1.0, 2.0);
-					popScale = (float) Math.max(0.08, 2.30 * easeBack);
+					popScale = (float) Math.max(0.1, 2.05 * easeBack);
 				} else {
-					popScale = 2.30F;
+					popScale = 2.05F;
 				}
-				float bobY = (float) (Math.sin(now * 0.0036) * 2.8);
-				ItemStack displayReward = s.upgraderRewardStack.isEmpty()
-						? new ItemStack(Items.NETHERITE_INGOT)
-						: s.upgraderRewardStack;
-				drawScaledItemCentered(ctx, displayReward, cx, cy + bobY, popScale, 0.0F);
+				float bobY = (float) (Math.sin(now * 0.0036) * 2.0);
+				ItemStack displayReward = s.upgraderRewardStack.isEmpty() ? targetCardStack : s.upgraderRewardStack;
+				drawScaledItemCentered(ctx, displayReward, viewCx, viewCy - 4.0F + bobY, popScale, 0.0F);
 				ctx.draw();
 
-				if (inRect(mx, my, (int) (cx - 24), (int) (cy - 24), 48, 48)) {
+				if (inRect(mx, my, Math.round(viewCx - 22), Math.round(viewCy - 26), 44, 44)) {
 					this.hoveredTooltipStack = displayReward;
 				}
 			} else {
-				// ==================== SHATTERED CRIMSON CORE -> LUMINOUS XP ORBS ====================
-				drawSmoothRadialGlow(mat, cx, cy, maxR + 18.0F, 0x48FF2E4C, 0x0029040C);
+				drawSmoothRadialGlow(mat, viewCx, viewCy - 2.0F, auraR + 6.0F, 0x38FF2E4C, 0x0020040A);
+				drawSmoothGlowRing(mat, viewCx, viewCy - 2.0F, auraR * 0.72F, 0.5F, 2.0F, 0x77FF5268);
 
-				// Expanding Crimson Fracture Shockwave (0.00s .. 0.68s)
-				if (revSec < 0.68) {
-					double p = revSec / 0.68;
-					float swR = (float) (6.0 + easeOutCubic(p) * (maxR + 34.0));
-					int swAlpha = (int) Math.round(225 * Math.pow(1.0 - p, 1.7));
-					drawSmoothGlowRing(mat, cx, cy, swR, 1.0F, 5.0F, withAlpha(0xFF425E, swAlpha));
+				if (revSec < 0.55) {
+					double p = revSec / 0.55;
+					float swR = (float) (8.0 + easeOutCubic(p) * (auraR + 18.0));
+					int swAlpha = (int) Math.round(175 * Math.pow(1.0 - p, 1.8));
+					drawSmoothGlowRing(mat, viewCx, viewCy - 2.0F, swR, 0.65F, 2.6F, withAlpha(0xFF425E, swAlpha));
 				}
 
-				// 8 Glowing Crimson-Amber Crystal Polygon Shards flying outward (0.00s .. 1.25s)
-				if (revSec < 1.25) {
-					double p = revSec / 1.25;
-					double ease = 1.0 - Math.pow(1.0 - p, 3.2);
-					int shardAlpha = (int) Math.round(235 * (1.0 - p));
-					for (int i = 0; i < 8; i++) {
-						double baseAng = i * (Math.PI * 2.0 / 8.0) + 0.22;
-						float dist = (float) (8.0 + ease * (maxR + 14.0) * (i % 2 == 0 ? 1.05 : 0.78));
-						float sx = cx + (float) (Math.cos(baseAng) * dist);
-						float sy = cy + (float) (Math.sin(baseAng) * dist + p * p * 12.0);
-						double spin = baseAng + p * (i % 2 == 0 ? 2.6 : -2.4);
-						drawCrystalShardPolygon(mat, sx, sy, 5.5F * (float) (1.0 - p * 0.35), spin,
-								withAlpha(0xFFFF6B52, shardAlpha), withAlpha(0xFFC81D35, shardAlpha / 2));
-					}
-				}
-
-				// 5 Smooth Volumetric Lime-Gold XP Orbs orbiting gently around the Experience Essence
-				double xpFade = Math.min(1.0, revSec / 0.45);
 				for (int i = 0; i < 5; i++) {
-					double xpAng = now * 0.0022 + i * (Math.PI * 2.0 / 5.0);
-					float xpR = (float) (25.0 + Math.sin(now * 0.0045 + i * 1.3) * 3.5);
-					float ox = cx + (float) (Math.cos(xpAng) * xpR);
-					float oy = cy + (float) (Math.sin(xpAng) * xpR);
-					int outerCol = withAlpha(0x7CFF3B, (int) (175 * xpFade));
-					int coreCol = withAlpha((i % 2 == 0) ? 0xE6FF85 : 0xFFE066, (int) (245 * xpFade));
-					drawSmoothRadialGlow(mat, ox, oy, 8.0F, outerCol, 0x00000000);
-					drawSmoothRadialGlow(mat, ox, oy, 3.4F, coreCol, 0x00000000);
+					double xpAng = slowRot * 1.9 + i * (Math.PI * 2.0 / 5.0);
+					float ox = viewCx + (float) (Math.cos(xpAng) * (auraR * 0.68F));
+					float oy = (viewCy - 2.0F) + (float) (Math.sin(xpAng) * (auraR * 0.52F));
+					drawSmoothRadialGlow(mat, ox, oy, 4.2F, 0xAA9EFF4D, 0x00000000);
 				}
-
-				drawSmoothRadialGlow(mat, cx, cy, 20.0F, withAlpha(0x8AFF47, (int) (95 * xpFade)), 0x00000000);
 				endAdditiveGlow();
 
-				float xpScale = (float) (1.85 * Math.min(1.0, easeOutCubic(Math.min(1.0, revSec / 0.40))));
-				float bobY = (float) (Math.sin(now * 0.0036) * 2.2);
-				drawScaledItemCentered(ctx, new ItemStack(Items.EXPERIENCE_BOTTLE), cx, cy + bobY, xpScale, 0.0F);
+				float xpScale = (float) (1.82 * Math.min(1.0, easeOutCubic(Math.min(1.0, revSec / 0.35))));
+				float bobY = (float) (Math.sin(now * 0.0036) * 1.8);
+				drawScaledItemCentered(ctx, essenceCardStack, viewCx, viewCy - 4.0F + bobY, xpScale, 0.0F);
 				ctx.draw();
 			}
 
-			// Foremost Circular Radial Energy Bloom right at Explosion (0.00s .. 0.55s) — round sphere, never a box!
-			if (revSec < 0.55) {
-				beginAdditiveGlow(ctx);
-				Matrix4f bloomMat = ctx.getMatrices().peek().getPositionMatrix();
-				double fade = Math.pow(1.0 - (revSec / 0.55), 2.2);
-				int bloomAlpha = Math.max(0, Math.min(245, (int) Math.round(235 * fade)));
-				int bloomRgb = s.upgraderWon ? 0xFFF7C2 : 0xFF425E;
-				float bloomR = (float) (maxR * 2.1 * (0.55 + 0.45 * (revSec / 0.55)));
-				drawSmoothRadialGlow(bloomMat, cx, cy, bloomR, withAlpha(bloomRgb, bloomAlpha), 0x00000000);
-				endAdditiveGlow();
-			}
+			ctx.disableScissor();
 		}
 
-		// 4. Spacious Bottom Status Readout, Animated Pity Meter & Action Controls
+		// 4. Neat Info, Spin Progress & Rounded Arcane Pity Section (Zero Overlap)
+		int infoY = viewY + viewH + 7;
 		if (spinning) {
-			String phaseText;
-			if (chargeT < 0.28) {
-				phaseText = goldenPityRitual
-						? "☀ Awakening Sovereign Golden Circle... ☀"
-						: "✦ Awakening the Arcane Circle... ✦";
-			} else if (chargeT < 0.74) {
-				phaseText = "✦ Absorbing " + s.upgraderSacrificedAmount + "x " + s.upgraderSacrificeName + " into the Crystal Core... ✦";
-			} else {
-				phaseText = goldenPityRitual
-						? "☀ Divine Guarantee Converging — Jackpot Imminent! ☀"
-						: "✦ Essence Converging — Fate Imminent... ✦";
-			}
-			drawCenteredText(ctx, trimToWidth(phaseText, stageW - 24), stageX + stageW / 2, arenaBot + 10, CrimsonTheme.GOLD);
+			String phaseTxt = chargeT < 0.68
+					? (goldenPitySpin ? "☀ Spinning Golden Guarantee Reel..." : "✦ Rolling Arcane Gacha Reel...")
+					: "✦ Decelerating — Locking Fate Under Needle...";
+			drawCenteredText(ctx, phaseTxt, stageX + stageW / 2, infoY, goldenPitySpin ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_PRIMARY);
 
-			int skipW = 124;
-			int skipH = 17;
+			// Smooth Thin Spin Deceleration Bar
+			int progY = infoY + 13;
+			CrimsonTheme.drawRoundedRect(ctx, viewX, progY, viewW, 5.0F, 2.5F, CrimsonTheme.BG_INPUT);
+			CrimsonTheme.drawRoundedOutline(ctx, viewX, progY, viewW, 5.0F, 2.5F, 0.5F, CrimsonTheme.BORDER_SUBTLE);
+			float progW = (float) (viewW * easeOutCubic(chargeT));
+			if (progW > 2.0F) {
+				CrimsonTheme.drawRoundedGradient(ctx, viewX, progY, progW, 5.0F, 2.5F,
+						goldenPitySpin ? CrimsonTheme.GOLD : CrimsonTheme.AMETHYST,
+						goldenPitySpin ? 0xFFD98218 : CrimsonTheme.CRIMSON_BRIGHT);
+			}
+
+			int skipW = 132;
+			int skipH = 18;
 			int skipX = stageX + (stageW - skipW) / 2;
-			int skipY = stageY + stageH - 23;
-			boolean canSkipNow = elapsedMs >= 350L;
+			int skipY = stageY + stageH - 25;
+			boolean canSkipNow = elapsedMs >= 250L;
 			boolean hovSkip = canSkipNow && inRect(mx, my, skipX, skipY, skipW, skipH);
-			CrimsonTheme.drawSubtleButton(ctx, this.textRenderer, skipX, skipY, skipW, skipH, "⏭ Skip Ritual [Space]", false, hovSkip);
+			CrimsonTheme.drawSubtleButton(ctx, this.textRenderer, skipX, skipY, skipW, skipH, "⏭ Skip Spin [Space]", false, hovSkip);
 			if (canSkipNow) {
 				clickZones.add(new ClickZone(skipX, skipY, skipW, skipH, () -> skipRitualToReveal(s)));
 			}
 		} else {
+			String rollSummary;
+			int rollCol;
+			double displayPity;
 			if (s.upgraderWon) {
-				String enchTag = s.upgraderInheritedEnchants > 0 ? ("  ✦ +" + s.upgraderInheritedEnchants + " Enchants") : "";
-				String headline = "✦ Obtained: " + s.upgraderTargetName + enchTag;
-				String rollLine = s.upgraderPityTriggered
-						? "☀ 100% Divine Pity Guarantee Consumed  ·  Pity Reset to 0%"
-						: ("Fate Roll: " + s.upgraderRolled + "% ≤ " + s.upgraderChance + "%  ·  Pity Reset (0%)");
-				drawCenteredText(ctx, trimToWidth(headline, stageW - 24), stageX + stageW / 2, arenaBot + 6, CrimsonTheme.GOLD);
-				drawCenteredText(ctx, trimToWidth(rollLine, stageW - 24), stageX + stageW / 2, arenaBot + 18,
-						s.upgraderPityTriggered ? CrimsonTheme.GOLD : CrimsonTheme.EMERALD);
+				rollSummary = s.upgraderPityTriggered
+						? "☀ 100% Divine Pity Consumed  ·  Arcane Pity Reset to 0%"
+						: ("Rolled " + s.upgraderRolled + "% ≤ " + s.upgraderChance + "% Needed  ·  JACKPOT!");
+				rollCol = s.upgraderPityTriggered ? CrimsonTheme.GOLD : CrimsonTheme.EMERALD;
+				displayPity = s.upgraderPity;
 			} else {
-				double fillAnim = easeOutCubic(Math.min(1.0, revSec / 0.85));
-				double animPity = s.upgraderPityBefore + (s.upgraderPityAfter - s.upgraderPityBefore) * fillAnim;
-				boolean hitMaxPity = s.upgraderPityAfter >= ItemUpgraderFeature.MAX_PITY;
-
-				String headline = hitMaxPity
-						? ("Essence: +" + s.upgraderXpRefund + " XP  ·  ☀ 100% PITY GUARANTEE READY!")
-						: ("Essence: +" + s.upgraderXpRefund + " XP  ·  Arcane Pity +" + s.upgraderPityGain + "% (" + s.upgraderPityAfter + "%)");
-				drawCenteredText(ctx, trimToWidth(headline, stageW - 24), stageX + stageW / 2, arenaBot + 4,
-						hitMaxPity ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_PRIMARY);
-
-				int barW = stageW - 44;
-				int barX = stageX + 22;
-				drawArcanePityBar(ctx, barX, arenaBot + 16, barW, 7, animPity, now);
-
-				String rollLine = "Rolled " + s.upgraderRolled + "% > " + s.upgraderChance + "% Needed";
-				drawCenteredText(ctx, trimToWidth(rollLine, stageW - 24), stageX + stageW / 2, arenaBot + 25, CrimsonTheme.CRIMSON_BRIGHT);
+				double fillAnim = easeOutCubic(Math.min(1.0, revSec / 0.75));
+				displayPity = s.upgraderPityBefore + (s.upgraderPityAfter - s.upgraderPityBefore) * fillAnim;
+				rollSummary = "Rolled " + s.upgraderRolled + "% > " + s.upgraderChance + "% Needed  ·  Pity +" + s.upgraderPityGain + "%";
+				rollCol = CrimsonTheme.TEXT_SECONDARY;
 			}
+			drawCenteredText(ctx, trimToWidth(rollSummary, viewW), stageX + stageW / 2, infoY, rollCol);
 
+			int pityLblY = infoY + 12;
+			boolean maxPityNow = displayPity >= ItemUpgraderFeature.MAX_PITY - 0.01;
+			String pityLeft = maxPityNow
+					? "☀ Divine Pity: 100% READY!"
+					: String.format(Locale.ROOT, "✦ Arcane Pity: %.1f%% / 100%%", displayPity);
+			String pityRight = maxPityNow ? "Guaranteed Next Spin!" : ("Streak " + s.upgraderFailStreak);
+			ctx.drawTextWithShadow(this.textRenderer, pityLeft, viewX, pityLblY,
+					maxPityNow ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_SECONDARY);
+			ctx.drawTextWithShadow(this.textRenderer, pityRight,
+					viewX + viewW - this.textRenderer.getWidth(pityRight), pityLblY,
+					maxPityNow ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_MUTED);
+
+			drawArcanePityBar(ctx, viewX, pityLblY + 11, viewW, 7, displayPity, now);
+
+			// Action Buttons
 			var clientPlayer = MinecraftClient.getInstance().player;
 			List<ItemUpgraderFeature.BagOfferSlot> liveOffers = clientPlayer == null
 					? List.of()
@@ -2685,19 +2709,19 @@ public class HardcoreDashboardScreen extends Screen {
 					&& rerollOffer.totalCount() > 0
 					&& (rerollOffer.sample().getItem() != tItem || rerollOffer.enchantCount() > 0);
 
-			int btnY = stageY + stageH - 22;
-			int btnH = 17;
+			int btnY = stageY + stageH - 25;
+			int btnH = 18;
 			if (canRerollSameItem) {
 				int nextAmt = Math.max(1, Math.min(rerollOffer.totalCount(), s.upgraderAmount));
 				double nextChance = ItemUpgraderFeature.calculateEffectiveWinChance(rerollOffer.sample(), nextAmt, tItem, s.upgraderPity);
 				boolean nextIsFullPity = s.upgraderPity >= ItemUpgraderFeature.MAX_PITY;
-				int btnW = (stageW - 26) / 2;
-				int leftBtnX = stageX + 10;
-				int rightBtnX = leftBtnX + btnW + 6;
+				int btnW = (viewW - 8) / 2;
+				int leftBtnX = viewX;
+				int rightBtnX = viewX + btnW + 8;
 
 				String rerollLabel = nextIsFullPity
-						? "☀ Guaranteed Pity!"
-						: ("↻ Roll Again (" + nextChance + "%)");
+						? "☀ Spin 100% Pity!"
+						: ("↻ Spin Again (" + nextChance + "%)");
 				int rerollCol = nextIsFullPity ? 0xFFB87414 : 0xFF7D1D58;
 				boolean hovReroll = inRect(mx, my, leftBtnX, btnY, btnW, btnH);
 				CrimsonTheme.drawButton(ctx, this.textRenderer, leftBtnX, btnY, btnW, btnH,
@@ -2706,13 +2730,13 @@ public class HardcoreDashboardScreen extends Screen {
 				final Item finalTItem = tItem;
 				clickZones.add(new ClickZone(leftBtnX, btnY, btnW, btnH, () -> triggerRitualRoll(s, finalReroll, finalTItem)));
 
-				String closeLabel = s.upgraderWon ? "✦ Claim & Close" : "Close Altar";
-				int closeColor = s.upgraderWon ? 0xFF1B7A4C : 0xFF3B202C;
+				String closeLabel = s.upgraderWon ? "✦ Claim & Close" : "Done";
+				int closeColor = s.upgraderWon ? 0xFF1B7A4C : 0xFF352230;
 				boolean hovClose = inRect(mx, my, rightBtnX, btnY, btnW, btnH);
 				CrimsonTheme.drawButton(ctx, this.textRenderer, rightBtnX, btnY, btnW, btnH, closeLabel, closeColor, hovClose);
 				clickZones.add(new ClickZone(rightBtnX, btnY, btnW, btnH, () -> closeRitualModal(s)));
 			} else {
-				int btnW = Math.min(184, stageW - 26);
+				int btnW = Math.min(180, viewW);
 				int btnX = stageX + (stageW - btnW) / 2;
 				String closeLabel = s.upgraderWon ? "✦ Claim & Continue" : "Continue";
 				int closeColor = s.upgraderWon ? 0xFF1B7A4C : CrimsonTheme.CRIMSON;
@@ -2728,18 +2752,18 @@ public class HardcoreDashboardScreen extends Screen {
 		boolean full = clamped >= 100.0;
 		boolean soft = !full && clamped >= ItemUpgraderFeature.SOFT_PITY_THRESHOLD;
 
-		int borderCol = full ? CrimsonTheme.GOLD : (soft ? 0xFFFF8C38 : 0xFF4A2559);
-		ctx.fill(x, y, x + w, y + h, 0xFF110814);
-		ctx.drawBorder(x, y, w, h, borderCol);
+		float r = h * 0.5F;
+		int borderCol = full ? CrimsonTheme.GOLD : (soft ? 0xFFFF8C38 : CrimsonTheme.BORDER_SUBTLE);
+		CrimsonTheme.drawRoundedRect(ctx, x, y, w, h, r, CrimsonTheme.BG_INPUT);
+		CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, r, 0.55F, CrimsonTheme.withAlpha(borderCol, 195));
 
-		int innerW = Math.max(0, w - 2);
-		int fillW = (int) Math.round((clamped / 100.0) * innerW);
-		if (fillW > 0) {
+		float fillW = (float) ((clamped / 100.0) * w);
+		if (fillW > 1.5F) {
 			int topCol;
 			int botCol;
 			if (full) {
 				int pulse = (int) (35 * (0.5 + 0.5 * Math.sin(now * 0.008)));
-				topCol = (0xFF << 24) | ((255) << 16) | (Math.min(255, 210 + pulse) << 8) | 90;
+				topCol = (0xFF << 24) | (255 << 16) | (Math.min(255, 210 + pulse) << 8) | 90;
 				botCol = 0xFFD98218;
 			} else if (soft) {
 				topCol = 0xFFFFA040;
@@ -2748,13 +2772,11 @@ public class HardcoreDashboardScreen extends Screen {
 				topCol = 0xFFC86BFF;
 				botCol = 0xFF5D2BB8;
 			}
-			ctx.fillGradient(x + 1, y + 1, x + 1 + fillW, y + h - 1, topCol, botCol);
-			int tipX = Math.min(x + innerW, x + fillW);
-			ctx.fill(Math.max(x + 1, tipX - 1), y + 1, tipX + 1, y + h - 1, 0xDDFFF6CC);
+			CrimsonTheme.drawRoundedGradient(ctx, x, y, fillW, h, Math.min(r, fillW * 0.5F), topCol, botCol);
 		}
 
-		int softX = x + 1 + (int) Math.round(innerW * (ItemUpgraderFeature.SOFT_PITY_THRESHOLD / 100.0));
-		ctx.fill(softX, y + 1, softX + 1, y + h - 1, full ? 0x88FFFFFF : 0xAAFFBC3B);
+		int softX = x + (int) Math.round(w * (ItemUpgraderFeature.SOFT_PITY_THRESHOLD / 100.0));
+		ctx.fill(softX, y + 1, softX + 1, y + h - 1, full ? 0x77FFFFFF : 0x88FFBC3B);
 	}
 
 	// ==================== SMOOTH OPENGL VECTOR & EASING PRIMITIVES ====================
@@ -3415,8 +3437,10 @@ public class HardcoreDashboardScreen extends Screen {
 		ctx.drawTextWithShadow(textRenderer, "Color:", x + 7, y + 9, CrimsonTheme.TEXT_SECONDARY);
 		int swX = x + 42;
 		for (int color : WAYPOINT_COLORS) {
-			ctx.fill(swX, y + 6, swX + 13, y + 19, color);
-			ctx.drawBorder(swX, y + 6, 13, 13, s.selectedWaypointColor == color ? 0xFFFFFFFF : 0xFF1A1015);
+			boolean selCol = (s.selectedWaypointColor == color);
+			CrimsonTheme.drawRoundedRect(ctx, swX, y + 6, 13, 13, 3.0F, color);
+			CrimsonTheme.drawRoundedOutline(ctx, swX, y + 6, 13, 13, 3.0F, selCol ? 0.85F : 0.5F,
+					selCol ? 0xFFFFFFFF : CrimsonTheme.BORDER_SUBTLE);
 			addClippedClick(swX, y + 6, 13, 13, clipTop, clipBot, () -> s.selectedWaypointColor = color);
 			swX += 16;
 		}
@@ -3617,12 +3641,12 @@ public class HardcoreDashboardScreen extends Screen {
 
 		if (active) {
 			CrimsonTheme.drawButton(ctx, this.textRenderer, x, y, w, h, trimToWidth("✦ " + label, w - 6), activeColor, hov);
-			CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, 4.5F, 1.1F, CrimsonTheme.GOLD);
+			CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, 4.5F, 0.65F, CrimsonTheme.GOLD);
 		} else {
 			int bg = hov ? CrimsonTheme.BG_CARD_HOVER : CrimsonTheme.BG_CARD;
 			CrimsonTheme.drawRoundedRect(ctx, x, y, w, h, 4.5F, bg);
-			CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, 4.5F, 1.0F, hov ? activeColor : CrimsonTheme.BORDER_SUBTLE);
-			CrimsonTheme.drawRoundedRect(ctx, x + 2.5F, y + 3.5F, 2.5F, h - 7.0F, 1.25F, activeColor);
+			CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, 4.5F, 0.55F, hov ? activeColor : CrimsonTheme.BORDER_SUBTLE);
+			CrimsonTheme.drawRoundedRect(ctx, x + 2.0F, y + 4.0F, 1.2F, h - 8.0F, 0.6F, CrimsonTheme.withAlpha(activeColor, 220));
 			String txt = trimToWidth(label, w - 8);
 			int tx = x + 3 + (w - 3 - this.textRenderer.getWidth(txt)) / 2;
 			int ty = y + (h - 8) / 2;
@@ -3672,11 +3696,11 @@ public class HardcoreDashboardScreen extends Screen {
 
 	private static void drawModernSlotBox(DrawContext ctx, int x, int y, int w, int h, boolean selected, boolean hovered, int selectedColor) {
 		int bg = selected
-				? CrimsonTheme.lerpColor(CrimsonTheme.BG_INPUT, selectedColor, 0.22F)
+				? CrimsonTheme.lerpColor(CrimsonTheme.BG_INPUT, selectedColor, 0.18F)
 				: (hovered ? CrimsonTheme.BG_CARD_HOVER : CrimsonTheme.BG_INPUT);
-		int border = selected ? selectedColor : (hovered ? CrimsonTheme.CRIMSON_BRIGHT : CrimsonTheme.BORDER_SUBTLE);
+		int border = selected ? CrimsonTheme.withAlpha(selectedColor, 210) : (hovered ? CrimsonTheme.CRIMSON_BRIGHT : CrimsonTheme.BORDER_SUBTLE);
 		CrimsonTheme.drawRoundedRect(ctx, x, y, w, h, 4.0F, bg);
-		CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, 4.0F, 1.0F, border);
+		CrimsonTheme.drawRoundedOutline(ctx, x, y, w, h, 4.0F, 0.55F, border);
 	}
 
 	private int drawTargetEnchantShowcase(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
@@ -3996,7 +4020,7 @@ public class HardcoreDashboardScreen extends Screen {
 
 	private static boolean isTabFeatureActive(ClientStateSnapshot s, int tab) {
 		return switch (tab) {
-			case 0 -> s.immortal || s.autoTotem || s.fullbright || s.returnByDeath;
+			case 0 -> s.immortal || s.autoTotem || s.fullbright || s.returnByDeath || s.timeStopEnabled || s.timeStopActive;
 			case 1 -> s.veinMiner || s.treeCapitator || s.veinAutoSmelt;
 			case 2 -> s.sneakGrow;
 			case 3 -> s.orePlusEnabled;

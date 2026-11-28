@@ -157,40 +157,39 @@ public final class CrimsonTheme {
 
 	public static void drawPanel(DrawContext ctx, int x, int y, int w, int h) {
 		float r = 8.0F;
-		// Multi-layer soft ambient drop shadow + subtle theme outer aura
-		drawRoundedRect(ctx, x - 5, y - 4, w + 10, h + 10, r + 4.0F, 0x36000000);
-		drawRoundedRect(ctx, x - 2, y - 2, w + 4, h + 5, r + 2.0F, 0x66000000);
-		drawRoundedRect(ctx, x - 1, y - 1, w + 2, h + 2, r + 1.0F, withAlpha(BORDER_OUTER, 95));
+		// Multi-layer soft ambient drop shadow
+		drawRoundedRect(ctx, x - 5, y - 4, w + 10, h + 10, r + 4.0F, 0x30000000);
+		drawRoundedRect(ctx, x - 2, y - 2, w + 4, h + 5, r + 2.0F, 0x58000000);
 
 		// Frosted dark glass body
 		drawRoundedRect(ctx, x, y, w, h, r, BG_WINDOW);
-		// Crisp rounded border + top specular glass rim
-		drawRoundedOutline(ctx, x, y, w, h, r, 1.1F, withAlpha(BORDER_OUTER, 215));
-		drawRoundedRect(ctx, x + 6, y + 1, w - 12, 1.0F, 0.5F, withAlpha(0xFFFFFFFF, 46));
+		// Ultra-fine rounded border + subtle top specular glass rim
+		drawRoundedOutline(ctx, x, y, w, h, r, 0.6F, withAlpha(BORDER_OUTER, 160));
+		drawRoundedRect(ctx, x + 8, y + 0.8F, w - 16, 0.6F, 0.3F, withAlpha(0xFFFFFFFF, 34));
 	}
 
 	public static void drawCard(DrawContext ctx, int x, int y, int w, int h, boolean hovered, int accentBarColor) {
 		float r = 5.0F;
 		if (hovered) {
-			drawRoundedRect(ctx, x - 1, y - 1, w + 2, h + 2, r + 1.0F, withAlpha(CRIMSON_BRIGHT, 36));
+			drawRoundedRect(ctx, x - 0.8F, y - 0.8F, w + 1.6F, h + 1.6F, r + 0.8F, withAlpha(CRIMSON_BRIGHT, 24));
 		}
 		drawRoundedGradient(ctx, x, y, w, h, r,
 				hovered ? brighten(BG_CARD_HOVER, 8) : brighten(BG_CARD, 4),
 				hovered ? BG_CARD_HOVER : BG_CARD);
-		drawRoundedOutline(ctx, x, y, w, h, r, 1.0F, hovered ? BORDER_HOVER : BORDER_SUBTLE);
+		drawRoundedOutline(ctx, x, y, w, h, r, 0.55F, hovered ? BORDER_HOVER : BORDER_SUBTLE);
 
 		if (accentBarColor != 0) {
-			float barH = Math.max(6.0F, h - 8.0F);
-			drawRoundedRect(ctx, x + 2.5F, y + (h - barH) * 0.5F, 2.6F, barH, 1.3F, accentBarColor);
+			float barH = Math.max(6.0F, h - 7.0F);
+			drawRoundedRect(ctx, x + 1.8F, y + (h - barH) * 0.5F, 1.2F, barH, 0.6F, withAlpha(accentBarColor, 225));
 		}
 	}
 
 	public static void drawSectionHeader(DrawContext ctx, TextRenderer font, int x, int y, int w, String title) {
-		drawRoundedRect(ctx, x, y + 3.5F, 3.2F, 9.5F, 1.6F, CRIMSON_BRIGHT);
-		ctx.drawTextWithShadow(font, title, x + 7, y + 4, CRIMSON_BRIGHT);
+		drawRoundedRect(ctx, x, y + 3.5F, 1.6F, 9.5F, 0.8F, CRIMSON_BRIGHT);
+		ctx.drawTextWithShadow(font, title, x + 6, y + 4, CRIMSON_BRIGHT);
 		int textW = font.getWidth(title);
-		if (x + textW + 14 < x + w) {
-			ctx.fillGradient(x + textW + 12, y + 8, x + w, y + 9, withAlpha(CRIMSON_BRIGHT, 90), withAlpha(BORDER_SUBTLE, 30));
+		if (x + textW + 13 < x + w) {
+			ctx.fillGradient(x + textW + 11, y + 8, x + w, y + 9, withAlpha(CRIMSON_BRIGHT, 68), withAlpha(BORDER_SUBTLE, 20));
 		}
 	}
 
@@ -224,10 +223,10 @@ public final class CrimsonTheme {
 		int borderColor = lerpColor(BORDER_SUBTLE, brighten(CRIMSON_BRIGHT, 28), cur);
 
 		if (cur > 0.15F) {
-			drawRoundedRect(ctx, x - 1, y - 1, w + 2, h + 2, r + 1.0F, withAlpha(CRIMSON_BRIGHT, (int) (52 * cur)));
+			drawRoundedRect(ctx, x - 0.8F, y - 0.8F, w + 1.6F, h + 1.6F, r + 0.8F, withAlpha(CRIMSON_BRIGHT, (int) (36 * cur)));
 		}
 		drawRoundedRect(ctx, x, y, w, h, r, trackColor);
-		drawRoundedOutline(ctx, x, y, w, h, r, 1.0F, borderColor);
+		drawRoundedOutline(ctx, x, y, w, h, r, 0.55F, borderColor);
 
 		float knobR = 4.8F;
 		float knobCx = (x + 7.0F) + cur * (w - 14.0F);
@@ -241,10 +240,10 @@ public final class CrimsonTheme {
 		int top = hovered ? brighten(accentColor, 28) : brighten(accentColor, 8);
 		int bot = hovered ? darken(accentColor, 18) : darken(accentColor, 34);
 		if (hovered) {
-			drawRoundedRect(ctx, x - 1, y - 1, w + 2, h + 2, r + 1.0F, withAlpha(accentColor, 72));
+			drawRoundedRect(ctx, x - 0.8F, y - 0.8F, w + 1.6F, h + 1.6F, r + 0.8F, withAlpha(accentColor, 48));
 		}
 		drawRoundedGradient(ctx, x, y, w, h, r, top, bot);
-		drawRoundedOutline(ctx, x, y, w, h, r, 1.0F, hovered ? brighten(accentColor, 55) : brighten(accentColor, 22));
+		drawRoundedOutline(ctx, x, y, w, h, r, 0.6F, withAlpha(hovered ? brighten(accentColor, 52) : brighten(accentColor, 20), 195));
 		int tx = x + (w - font.getWidth(label)) / 2;
 		int ty = y + (h - 8) / 2;
 		ctx.drawTextWithShadow(font, label, tx, ty, TEXT_PRIMARY);
@@ -254,9 +253,9 @@ public final class CrimsonTheme {
 		float r = 4.5F;
 		int top = active ? brighten(CRIMSON_DARK, 18) : (hovered ? brighten(BG_CARD_HOVER, 10) : BG_CARD);
 		int bot = active ? CRIMSON_DARK : (hovered ? BG_CARD_HOVER : darken(BG_CARD, 8));
-		int border = active ? CRIMSON_BRIGHT : (hovered ? BORDER_HOVER : BORDER_SUBTLE);
+		int border = active ? withAlpha(CRIMSON_BRIGHT, 195) : (hovered ? BORDER_HOVER : BORDER_SUBTLE);
 		drawRoundedGradient(ctx, x, y, w, h, r, top, bot);
-		drawRoundedOutline(ctx, x, y, w, h, r, 1.0F, border);
+		drawRoundedOutline(ctx, x, y, w, h, r, 0.55F, border);
 		int tx = x + (w - font.getWidth(label)) / 2;
 		int ty = y + (h - 8) / 2;
 		ctx.drawTextWithShadow(font, label, tx, ty, active ? TEXT_PRIMARY : (hovered ? TEXT_PRIMARY : TEXT_SECONDARY));
@@ -274,7 +273,7 @@ public final class CrimsonTheme {
 		float trackH = 5.0F;
 		float tr = 2.5F;
 		drawRoundedRect(ctx, x, trackY, w, trackH, tr, BG_INPUT);
-		drawRoundedOutline(ctx, x, trackY, w, trackH, tr, 0.9F, BORDER_SUBTLE);
+		drawRoundedOutline(ctx, x, trackY, w, trackH, tr, 0.5F, BORDER_SUBTLE);
 
 		float ratio = (max <= min) ? 1.0F : Math.max(0.0F, Math.min(1.0F, (float) (value - min) / (float) (max - min)));
 		float fillW = Math.max(0.0F, w * ratio);
@@ -285,10 +284,10 @@ public final class CrimsonTheme {
 		float knobCx = x + Math.max(4.0F, Math.min(w - 4.0F, w * ratio));
 		float knobCy = trackY + trackH * 0.5F;
 		if (active) {
-			drawCircle(ctx, knobCx, knobCy, 6.2F, withAlpha(CRIMSON_BRIGHT, 75));
+			drawCircle(ctx, knobCx, knobCy, 6.0F, withAlpha(CRIMSON_BRIGHT, 65));
 		}
-		drawCircle(ctx, knobCx, knobCy, 4.4F, active ? 0xFFFFFFFF : 0xFFF2ECF0);
-		drawCircle(ctx, knobCx, knobCy, 2.1F, CRIMSON_BRIGHT);
+		drawCircle(ctx, knobCx, knobCy, 4.2F, active ? 0xFFFFFFFF : 0xFFF2ECF0);
+		drawCircle(ctx, knobCx, knobCy, 2.0F, CRIMSON_BRIGHT);
 	}
 
 	public static int drawBadge(DrawContext ctx, TextRenderer font, int x, int y, String text, int bg, int border, int textColor) {
@@ -296,7 +295,7 @@ public final class CrimsonTheme {
 		int h = 11;
 		float r = 4.5F;
 		drawRoundedRect(ctx, x, y, w, h, r, bg);
-		drawRoundedOutline(ctx, x, y, w, h, r, 0.9F, border);
+		drawRoundedOutline(ctx, x, y, w, h, r, 0.5F, withAlpha(border, 185));
 		ctx.drawTextWithShadow(font, text, x + 5, y + 2, textColor);
 		return w;
 	}

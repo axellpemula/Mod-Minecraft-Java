@@ -9,6 +9,7 @@ import com.axell.hardcoretools.feature.ActionDispatcher;
 import com.axell.hardcoretools.feature.CombatAimFeature;
 import com.axell.hardcoretools.feature.EnchantFeature;
 import com.axell.hardcoretools.feature.ProtectionHandler;
+import com.axell.hardcoretools.feature.TimeStopFeature;
 import com.axell.hardcoretools.feature.WeaponDamageFeature;
 import com.axell.hardcoretools.state.HardcoreStateManager;
 import com.axell.hardcoretools.state.PlayerProfile;
@@ -80,6 +81,18 @@ public final class HardcoreNetworking {
 		}
 	}
 
+	public record TimeStopEventS2CPayload(String json) implements CustomPayload {
+		public static final CustomPayload.Id<TimeStopEventS2CPayload> ID =
+				new CustomPayload.Id<>(Identifier.of(HardcoreToolsMod.MOD_ID, "timestop_event"));
+		public static final PacketCodec<RegistryByteBuf, TimeStopEventS2CPayload> CODEC =
+				PacketCodec.tuple(PacketCodecs.string(16384), TimeStopEventS2CPayload::json, TimeStopEventS2CPayload::new);
+
+		@Override
+		public CustomPayload.Id<? extends CustomPayload> getId() {
+			return ID;
+		}
+	}
+
 	public record ActionC2SPayload(String action, String payloadJson) implements CustomPayload {
 		public static final CustomPayload.Id<ActionC2SPayload> ID =
 				new CustomPayload.Id<>(Identifier.of(HardcoreToolsMod.MOD_ID, "action"));
@@ -103,6 +116,7 @@ public final class HardcoreNetworking {
 		PayloadTypeRegistry.playS2C().register(SyncStateS2CPayload.ID, SyncStateS2CPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(OpenScreenS2CPayload.ID, OpenScreenS2CPayload.CODEC);
 		PayloadTypeRegistry.playS2C().register(RewindEventS2CPayload.ID, RewindEventS2CPayload.CODEC);
+		PayloadTypeRegistry.playS2C().register(TimeStopEventS2CPayload.ID, TimeStopEventS2CPayload.CODEC);
 		PayloadTypeRegistry.playC2S().register(ActionC2SPayload.ID, ActionC2SPayload.CODEC);
 	}
 
@@ -136,6 +150,15 @@ public final class HardcoreNetworking {
 
 	public static void sendRewindEvent(ServerPlayerEntity player, String rewindJson) {
 		ServerPlayNetworking.send(player, new RewindEventS2CPayload(rewindJson));
+	}
+
+	public static void sendTimeStopEvent(ServerPlayerEntity player, boolean active, String event, int hits, float damage) {
+		JsonObject o = new JsonObject();
+		o.addProperty("active", active);
+		o.addProperty("event", event == null ? "" : event);
+		o.addProperty("hits", hits);
+		o.addProperty("damage", Math.round(damage * 10.0F) / 10.0F);
+		ServerPlayNetworking.send(player, new TimeStopEventS2CPayload(GSON.toJson(o)));
 	}
 
 	public static String buildSnapshotJson(ServerPlayerEntity player, String toastMessage, boolean toastSuccess) {
@@ -182,6 +205,8 @@ public final class HardcoreNetworking {
 		root.addProperty("returnByDeathCooldown", profile.returnByDeathCooldown);
 		long remCdTicks = Math.max(0L, profile.returnByDeathReadyTick - server.getTicks());
 		root.addProperty("returnByDeathCooldownLeft", (int) Math.ceil(remCdTicks / 20.0));
+		root.addProperty("timeStopEnabled", profile.timeStopEnabled);
+		root.addProperty("timeStopActive", TimeStopFeature.isTimeStopped(server));
 
 		// Vein & Tree
 		root.addProperty("veinMiner", profile.veinMiner);

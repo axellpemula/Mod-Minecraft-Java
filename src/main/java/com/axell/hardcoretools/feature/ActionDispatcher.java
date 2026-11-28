@@ -147,6 +147,18 @@ public final class ActionDispatcher {
 						? "Rewind Cooldown: None (Always Ready)"
 						: ("Rewind Cooldown: " + profile.returnByDeathCooldown + "s");
 			}
+			case "toggle_timestop_enabled" -> {
+				profile.timeStopEnabled = !profile.timeStopEnabled;
+				HardcoreStateManager.save(server);
+				if (!profile.timeStopEnabled && TimeStopFeature.isTimeStopped(server)) {
+					TimeStopFeature.resumeTimeStop(server, player, true);
+				}
+				toast = "⏸ Time Stop: " + (profile.timeStopEnabled ? "ON (Use Keybind in-game)" : "OFF");
+			}
+			case "trigger_timestop" -> {
+				TimeStopFeature.toggleTimeStopFromKeybind(player);
+				return;
+			}
 
 			// 2. Vein Miner & Tree Capitator
 			case "toggle_vein" -> {

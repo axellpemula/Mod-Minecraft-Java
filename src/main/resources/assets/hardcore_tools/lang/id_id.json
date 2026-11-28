@@ -355,5 +355,6 @@
   "hc.java.tab.weapons": "Damage Senjata",
   "hc.java.tab.info": "Info",
   "key.hardcore_tools.toggle_fullbright": "Aktifkan / Matikan Fullbright",
-  "key.hardcore_tools.radial_wheel": "Buka Menu Roda Cepat / Radial Wheel"
+  "key.hardcore_tools.radial_wheel": "Buka Menu Roda Cepat / Radial Wheel",
+  "key.hardcore_tools.time_stop": "Hentikan / Jalankan Waktu Dunia (Time Stop)"
 }

@@ -415,6 +415,9 @@ public final class WeaponDamageFeature {
 		if (attacker == null || target == null || source == null || amount <= 0.0F) {
 			return amount;
 		}
+		if (TimeStopFeature.isFlushingDeferredDamage()) {
+			return amount;
+		}
 		MinecraftServer server = attacker.getServer();
 		if (server == null) return amount;
 
