@@ -10,6 +10,7 @@
 		"LevelPropertiesAccessor",
 		"ProjectileSilentAimMixin",
 		"ServerPlayerInteractionManagerMixin",
+		"TimeStopDamageMixin",
 		"WeaponDamageMixin",
 		"WorldMixin"
 	],

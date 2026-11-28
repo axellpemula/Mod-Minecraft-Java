@@ -196,6 +196,7 @@ public class ClientStateSnapshot {
 		this.serverModSynced = false;
 		this.aimbotEnabled = false;
 		this.aimSilentEnabled = false;
+		this.timeStopActive = false;
 	}
 
 	// Toast banner
@@ -227,6 +228,8 @@ public class ClientStateSnapshot {
 	public int returnByDeathSeconds = 60;
 	public int returnByDeathCooldown = 0;
 	public int returnByDeathCooldownLeft = 0;
+	public boolean timeStopEnabled = false;
+	public boolean timeStopActive = false;
 
 	public boolean veinMiner;
 	public boolean treeCapitator;
@@ -326,6 +329,8 @@ public class ClientStateSnapshot {
 			this.returnByDeathSeconds = numInt(r, "returnByDeathSeconds", returnByDeathSeconds);
 			this.returnByDeathCooldown = numInt(r, "returnByDeathCooldown", returnByDeathCooldown);
 			this.returnByDeathCooldownLeft = numInt(r, "returnByDeathCooldownLeft", returnByDeathCooldownLeft);
+			this.timeStopEnabled = bool(r, "timeStopEnabled", timeStopEnabled);
+			this.timeStopActive = bool(r, "timeStopActive", timeStopActive);
 
 			this.veinMiner = bool(r, "veinMiner", veinMiner);
 			this.treeCapitator = bool(r, "treeCapitator", treeCapitator);

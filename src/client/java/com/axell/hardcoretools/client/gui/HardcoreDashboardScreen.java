@@ -95,6 +95,9 @@ public class HardcoreDashboardScreen extends Screen {
 			new InfoEntry(icon("rbd"), "Return by Death", "Protection", 0xFFC86BFF,
 					"Mencegah kematian permanen Hardcore setelah Totem habis lalu memutar balik waktu dunia hingga -60 detik (koreografi 20 detik: karakter rebah & item terpental, kaca layar retak & pecah, lalu dunia monokrom fast-reverse memulihkan blok, mob, langit, posisi, dan isi tas).",
 					"Intercepts fatal Hardcore deaths when no Totems remain and rewinds up to 60 seconds of world state over a 20s sequence—restoring broken blocks, mobs, sky time, position, and full inventory."),
+			new InfoEntry(icon("timestop"), "Time Stop (Hentikan Waktu)", "Protection", 0xFF7DD3FC,
+					"Aktifkan toggle Time Stop di tab Protection lalu tekan keybind [V] di dalam game untuk menghentikan waktu dunia 100% dalam efek monokrom abu-abu kecuali dirimu. Semua pukulan/serangan ke mob akan menumpuk dan baru meledak mematikan target saat kamu menekan [V] lagi untuk menjalankan waktu normal.",
+					"Enable Time Stop in Protection then press [V] in-game to freeze 100% of world time in monochrome grayscale except yourself. Every attack against frozen entities stacks up and detonates simultaneously the instant you press [V] again to resume normal time."),
 			new InfoEntry(icon("veinminer"), "Vein Miner & Tree Capitator", "World & Ore", 0xFF38C9FF,
 					"Menghancurkan satu urat bijih sekaligus dengan Pickaxe dan menebang pohon alami utuh dengan Axe tanpa merusak bangunan kayu. Dilengkapi Auto-Collect, Auto-Smelt Ores, dan Instant Leaf Decay pintar.",
 					"Breaks connected ore veins in one swing with a Pickaxe and fells natural trees with an Axe while ignoring player builds. Includes Auto-Collect, Auto-Smelt Ores, and smart single-tree Instant Leaf Decay."),
@@ -523,6 +526,18 @@ public class HardcoreDashboardScreen extends Screen {
 					s.autoTotem ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_SECONDARY);
 		}
 
+		if (s.timeStopActive || s.timeStopEnabled) {
+			String tsChip = s.timeStopActive ? "⏸ TIME STOPPED" : "⏸ TIME STOP";
+			int tsw = this.textRenderer.getWidth(tsChip) + 10;
+			if (chipRight - (tsw + 4) >= minChipLeft) {
+				chipRight -= (tsw + 4);
+				CrimsonTheme.drawBadge(ctx, this.textRenderer, chipRight, chipY, tsChip,
+						s.timeStopActive ? 0x447DD3FC : CrimsonTheme.BG_INPUT,
+						s.timeStopActive ? 0xFF7DD3FC : CrimsonTheme.BORDER_SUBTLE,
+						s.timeStopActive ? 0xFFE0F2FE : CrimsonTheme.TEXT_SECONDARY);
+			}
+		}
+
 		if (s.returnByDeath) {
 			String rbdChip = s.returnByDeathCooldownLeft > 0
 					? ("⏪ " + s.returnByDeathCooldownLeft + "s")
@@ -912,6 +927,26 @@ public class HardcoreDashboardScreen extends Screen {
 				s.returnByDeathCooldown, 0, 300, clipTop, clipBot, mx, my,
 				v -> s.returnByDeathCooldown = v,
 				v -> sendIntAction("set_rbd_cooldown", v));
+
+		String tsKey = HardcoreToolsClient.getKeyLabel(HardcoreToolsClient.timeStopKey, "V");
+		String tsHdr = s.timeStopActive
+				? ("⏸ TIME STOP  ·  WORLD FROZEN [" + tsKey + "]")
+				: ("⏸ TIME STOP  ·  KEYBIND [" + tsKey + "]");
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y + 4, w, tsHdr);
+		y += 22;
+		y = drawToggleCard(ctx, x, y, w, "Time Stop",
+				s.timeStopEnabled, clipTop, clipBot, mx, my,
+				() -> sendAction("toggle_timestop_enabled", new JsonObject()));
+
+		CrimsonTheme.drawCard(ctx, x, y, w, 18, false, s.timeStopActive ? 0xFF7DD3FC : 0);
+		String tsHint = s.timeStopActive
+				? ("⏸ World Frozen — Press [" + tsKey + "] in-game to resume time & detonate stacked hits")
+				: (s.timeStopEnabled
+						? ("Ready · Press [" + tsKey + "] in-game to freeze/resume world time & stack damage")
+						: ("Turn ON above, then press [" + tsKey + "] in-game (Controls → Void Sovereign)"));
+		ctx.drawTextWithShadow(textRenderer, trimToWidth(tsHint, w - 14), x + 7, y + 5,
+				s.timeStopActive ? 0xFFBAE6FD : (s.timeStopEnabled ? CrimsonTheme.TEXT_SECONDARY : CrimsonTheme.TEXT_MUTED));
+		y += 22;
 		return y;
 	}
 
@@ -3985,7 +4020,7 @@ public class HardcoreDashboardScreen extends Screen {
 
 	private static boolean isTabFeatureActive(ClientStateSnapshot s, int tab) {
 		return switch (tab) {
-			case 0 -> s.immortal || s.autoTotem || s.fullbright || s.returnByDeath;
+			case 0 -> s.immortal || s.autoTotem || s.fullbright || s.returnByDeath || s.timeStopEnabled || s.timeStopActive;
 			case 1 -> s.veinMiner || s.treeCapitator || s.veinAutoSmelt;
 			case 2 -> s.sneakGrow;
 			case 3 -> s.orePlusEnabled;

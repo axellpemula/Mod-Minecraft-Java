@@ -30,6 +30,7 @@ public class HardcoreToolsClient implements ClientModInitializer {
 	public static KeyBinding openDashboardKey;
 	public static KeyBinding toggleFullbrightKey;
 	public static KeyBinding radialWheelKey;
+	public static KeyBinding timeStopKey;
 
 	public static KeyBinding getRadialWheelKey() {
 		return radialWheelKey;
@@ -66,6 +67,13 @@ public class HardcoreToolsClient implements ClientModInitializer {
 				"category.hardcore_tools"
 		));
 
+		timeStopKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+				"key.hardcore_tools.time_stop",
+				InputUtil.Type.KEYSYM,
+				GLFW.GLFW_KEY_V,
+				"category.hardcore_tools"
+		));
+
 		ClientPlayNetworking.registerGlobalReceiver(HardcoreNetworking.SyncStateS2CPayload.ID, (payload, context) -> {
 			context.client().execute(() -> {
 				ClientStateSnapshot.INSTANCE.applyJson(payload.json());
@@ -88,9 +96,14 @@ public class HardcoreToolsClient implements ClientModInitializer {
 			context.client().execute(() -> ReturnByDeathClientController.handleServerPayload(payload.json()));
 		});
 
+		ClientPlayNetworking.registerGlobalReceiver(HardcoreNetworking.TimeStopEventS2CPayload.ID, (payload, context) -> {
+			context.client().execute(() -> TimeStopClientController.handleServerPayload(payload.json()));
+		});
+
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			client.execute(() -> {
 				ReturnByDeathClientController.reset();
+				TimeStopClientController.reset();
 				CombatAimClientController.reset();
 				ClientStateSnapshot.INSTANCE.resetOnDisconnect();
 			});
@@ -105,11 +118,13 @@ public class HardcoreToolsClient implements ClientModInitializer {
 		});
 
 		HudRenderCallback.EVENT.register(ReturnByDeathClientController::renderAct3HudOverlay);
+		HudRenderCallback.EVENT.register(TimeStopClientController::renderTimeStopHud);
 		HudRenderCallback.EVENT.register(CombatAimClientController::renderAimHud);
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			applyClientWorldHardcore(client);
 			ReturnByDeathClientController.onClientTick(client);
+			TimeStopClientController.onClientTick(client);
 			if (ReturnByDeathClientController.isActive()) {
 				return;
 			}
@@ -151,6 +166,21 @@ public class HardcoreToolsClient implements ClientModInitializer {
 					JsonObject obj = new JsonObject();
 					obj.addProperty("value", next);
 					ClientPlayNetworking.send(new HardcoreNetworking.ActionC2SPayload("toggle_fullbright", obj.toString()));
+				}
+			}
+
+			while (timeStopKey.wasPressed()) {
+				if (client.player == null || client.currentScreen != null) continue;
+				if (!ClientStateSnapshot.INSTANCE.timeStopEnabled && !ClientStateSnapshot.INSTANCE.timeStopActive) {
+					client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 0.75F));
+					client.inGameHud.setOverlayMessage(
+							Text.literal("⏸ Time Stop is OFF — Enable it in Dashboard [H] → Protection").formatted(Formatting.GRAY),
+							false
+					);
+					continue;
+				}
+				if (ClientPlayNetworking.canSend(HardcoreNetworking.ActionC2SPayload.ID)) {
+					ClientPlayNetworking.send(new HardcoreNetworking.ActionC2SPayload("trigger_timestop", "{}"));
 				}
 			}
 		});

@@ -355,5 +355,6 @@
   "hc.java.tab.weapons": "Weapons",
   "hc.java.tab.info": "Info",
   "key.hardcore_tools.toggle_fullbright": "Toggle Fullbright",
-  "key.hardcore_tools.radial_wheel": "Open Quick Radial Wheel"
+  "key.hardcore_tools.radial_wheel": "Open Quick Radial Wheel",
+  "key.hardcore_tools.time_stop": "Freeze / Resume World Time (Time Stop)"
 }

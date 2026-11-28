@@ -7,6 +7,7 @@ import com.axell.hardcoretools.command.HardcoreCommands;
 import com.axell.hardcoretools.feature.ProtectionHandler;
 import com.axell.hardcoretools.feature.ReturnByDeathFeature;
 import com.axell.hardcoretools.feature.SneakGrowHandler;
+import com.axell.hardcoretools.feature.TimeStopFeature;
 import com.axell.hardcoretools.feature.VeinMinerHandler;
 import com.axell.hardcoretools.feature.WeaponDamageFeature;
 import com.axell.hardcoretools.network.HardcoreNetworking;
@@ -51,15 +52,18 @@ public class HardcoreToolsMod implements ModInitializer {
 					player.sendMessage(Text.translatable("hc.java.hint.join", "H"), false);
 				}
 				HardcoreNetworking.sendSyncState(player, "", true);
+				TimeStopFeature.syncPlayerOnJoin(server, player);
 			});
 		});
 
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
 			ServerPlayerEntity player = handler.getPlayer();
+			TimeStopFeature.onPlayerDisconnect(server, player);
 			ReturnByDeathFeature.onPlayerDisconnect(server, player);
 		});
 
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			TimeStopFeature.onServerStopping(server);
 			ReturnByDeathFeature.abortAllActiveSessions(server);
 			HardcoreStateManager.save(server);
 			HardcoreStateManager.clearCache();

@@ -17,6 +17,7 @@ public class PlayerProfile {
 	public int returnByDeathSeconds = 60; // 15..60s (1 minute default)
 	public int returnByDeathCooldown = 0; // 0..300s (0 = always ready)
 	public transient long returnByDeathReadyTick = 0L;
+	public boolean timeStopEnabled = false;
 
 	// Vein Miner & Tree Capitator
 	public boolean veinMiner = false;
