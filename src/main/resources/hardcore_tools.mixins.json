@@ -8,6 +8,7 @@
 		"HopperBlockEntityMixin",
 		"LevelInfoAccessor",
 		"LevelPropertiesAccessor",
+		"ProjectileSilentAimMixin",
 		"ServerPlayerInteractionManagerMixin",
 		"WeaponDamageMixin",
 		"WorldMixin"

@@ -89,7 +89,11 @@ public class HardcoreToolsClient implements ClientModInitializer {
 		});
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-			client.execute(ReturnByDeathClientController::reset);
+			client.execute(() -> {
+				ReturnByDeathClientController.reset();
+				CombatAimClientController.reset();
+				ClientStateSnapshot.INSTANCE.resetOnDisconnect();
+			});
 		});
 
 		CoreShaderRegistrationCallback.EVENT.register(context -> {
@@ -101,6 +105,7 @@ public class HardcoreToolsClient implements ClientModInitializer {
 		});
 
 		HudRenderCallback.EVENT.register(ReturnByDeathClientController::renderAct3HudOverlay);
+		HudRenderCallback.EVENT.register(CombatAimClientController::renderAimHud);
 
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
 			applyClientWorldHardcore(client);

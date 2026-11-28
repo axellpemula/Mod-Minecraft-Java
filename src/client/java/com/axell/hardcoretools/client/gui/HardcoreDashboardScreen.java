@@ -103,9 +103,9 @@ public class HardcoreDashboardScreen extends Screen {
 			new InfoEntry(icon("oreplus"), "Ore Plus+", "World & Ore", 0xFFFF8C38,
 					"Menggandakan hasil tambang bijih mentah (x2 hingga x4) dan dapat diatur aktif/nonaktif untuk masing-masing jenis bijih.",
 					"Multiplies raw ore drops (x2 to x4) with individual per-ore filters so you control exactly which ores get boosted."),
-			new InfoEntry(icon("weapons"), "Weapon Damage Studio", "Gear & Magic", 0xFFFF4264,
-					"Kustomisasi damage seluruh senjata secara live (Sword, Axe, Mace, Trident, Bow, Crossbow, alat, hingga senjata mod) + tempa Attack Damage & Attack Speed kustom pada item spesifik di tas lengkap dengan update tooltip hijau asli.",
-					"Customize live damage across all weapons (Swords, Axes, Mace, Trident, Bow, Crossbow, tools, and modded weapons) plus forge custom Attack Damage & Attack Speed onto specific bag items with native green tooltip updates."),
+			new InfoEntry(icon("weapons"), "Weapons, Aimbot & Silent Aim", "Gear & Magic", 0xFFFF4264,
+					"Kustomisasi damage seluruh senjata secara live, tempa Attack Damage & Attack Speed kustom per item di tas, serta fitur Aimbot & Aim Silent dengan lingkaran FOV di layar, cek visibilitas (tidak tembus dinding), dan filter mob yang tidak boleh terkena serangan.",
+					"Customize live damage across all weapons, forge custom Attack Damage & Attack Speed onto specific bag items, and configure Aimbot & Silent Aim with an on-screen FOV Circle, Line-of-Sight visibility check, and protected mob exclusion filters."),
 			new InfoEntry(icon("enchant"), "Enchants & God Stack (Lv. 25)", "Gear & Magic", 0xFFC86BFF,
 					"Pasang enchantment langsung ke senjata, alat, atau armor di tas hingga Over-Enchant Level XXV (25), 1-Click Auto Max All Gear, serta God Stack untuk menggabungkan enchant yang normalnya saling bentrok.",
 					"Apply enchantments directly to any gear in your bag up to Over-Enchant Level XXV (25), 1-Click Auto Max All Gear, and God Stack to combine mutually exclusive enchantments."),
@@ -317,6 +317,12 @@ public class HardcoreDashboardScreen extends Screen {
 					});
 					this.primaryInput.setPlaceholder(Text.literal("Exact Damage (e.g. 25, 250, 9999)...").formatted(Formatting.DARK_GRAY));
 					this.primaryInput.setText(formatWeaponStat(s.pendingBagDamage));
+				} else if (s.weaponStudioSubMode == 2) {
+					this.primaryInput.setPlaceholder(Text.literal("Search mob to protect/exclude (e.g. creeper, villager)...").formatted(Formatting.DARK_GRAY));
+					this.primaryInput.setText(this.searchQuery);
+					this.primaryInput.setChangedListener(val -> {
+						this.searchQuery = val;
+					});
 				} else {
 					this.primaryInput.setPlaceholder(Text.literal("Search sword, axe, mace, bow, trident...").formatted(Formatting.DARK_GRAY));
 					this.primaryInput.setText(this.searchQuery);
@@ -1000,42 +1006,43 @@ public class HardcoreDashboardScreen extends Screen {
 		return y;
 	}
 
-	// ==================== TAB 4: LIVE WEAPON DAMAGE STUDIO ====================
+	// ==================== TAB 4: LIVE WEAPON DAMAGE & COMBAT AIM STUDIO ====================
 	private int renderWeaponDamageTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
-		// Top Mode Switcher: [ ⚔ All-Weapons Live Catalog ] | [ 🎒 Bag & Hand Item Forge ]
-		int halfW = (w - 6) / 2;
-		boolean catActive = (s.weaponStudioSubMode == 0);
-		boolean bagActive = (s.weaponStudioSubMode == 1);
-		boolean hovCat = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, halfW, 19);
-		boolean hovBag = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x + halfW + 6, y, w - halfW - 6, 19);
+		// Top Mode Switcher: [ ⚔ All-Weapons ] | [ 🎒 Bag Forge ] | [ 🎯 Aim & FOV ]
+		int gap = 4;
+		int thirdW = (w - gap * 2) / 3;
+		int lastW = w - (thirdW + gap) * 2;
+		String[] subLabels = { "⚔ All-Weapons", "🎒 Bag Forge", "🎯 Aim & FOV" };
+		int[] subWidths = { thirdW, thirdW, lastW };
 
-		CrimsonTheme.drawSubtleButton(ctx, textRenderer, x, y, halfW, 19,
-				trimToWidth("⚔ All-Weapons Catalog", halfW - 8), catActive, hovCat);
-		CrimsonTheme.drawSubtleButton(ctx, textRenderer, x + halfW + 6, y, w - halfW - 6, 19,
-				trimToWidth("🎒 Bag & Hand Forge", w - halfW - 14), bagActive, hovBag);
-
-		addClippedClick(x, y, halfW, 19, clipTop, clipBot, () -> {
-			if (s.weaponStudioSubMode != 0) {
-				s.weaponStudioSubMode = 0;
-				this.contentScroll = 0;
-				this.targetContentScroll = 0;
-				configureInputForActiveTab();
+		int sx = x;
+		for (int i = 0; i < 3; i++) {
+			int bw = subWidths[i];
+			boolean active = (s.weaponStudioSubMode == i);
+			boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, sx, y, bw, 19);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, sx, y, bw, 19,
+					trimToWidth(subLabels[i], bw - 6), active, hov);
+			if (i == 2 && (s.aimbotEnabled || s.aimSilentEnabled)) {
+				CrimsonTheme.drawCircle(ctx, sx + bw - 5.0F, y + 5.0F, 1.9F, CrimsonTheme.EMERALD);
 			}
-		});
-		addClippedClick(x + halfW + 6, y, w - halfW - 6, 19, clipTop, clipBot, () -> {
-			if (s.weaponStudioSubMode != 1) {
-				s.weaponStudioSubMode = 1;
-				this.contentScroll = 0;
-				this.targetContentScroll = 0;
-				configureInputForActiveTab();
-			}
-		});
+			final int targetSub = i;
+			addClippedClick(sx, y, bw, 19, clipTop, clipBot, () -> {
+				if (s.weaponStudioSubMode != targetSub) {
+					s.weaponStudioSubMode = targetSub;
+					this.contentScroll = 0;
+					this.targetContentScroll = 0;
+					configureInputForActiveTab();
+				}
+			});
+			sx += bw + gap;
+		}
 		y += 23;
 
-		if (s.weaponStudioSubMode == 1) {
-			return renderBagWeaponForgeSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-		}
-		return renderWeaponCatalogSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+		return switch (s.weaponStudioSubMode) {
+			case 1 -> renderBagWeaponForgeSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 2 -> renderCombatAimSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			default -> renderWeaponCatalogSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+		};
 	}
 
 	private int renderWeaponCatalogSubMode(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
@@ -1426,6 +1433,151 @@ public class HardcoreDashboardScreen extends Screen {
 		}
 
 		return y;
+	}
+
+	private int renderCombatAimSubMode(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "AIMBOT & SILENT AIM");
+		y += 16;
+
+		y = drawToggleCard(ctx, x, y, w, "Aimbot (Camera Lock-On in FOV)",
+				s.aimbotEnabled, clipTop, clipBot, mx, my, () -> sendAction("toggle_aimbot", new JsonObject()));
+		y = drawToggleCard(ctx, x, y, w, "Aim Silent (Hit Inside FOV Circle)",
+				s.aimSilentEnabled, clipTop, clipBot, mx, my, () -> sendAction("toggle_aim_silent", new JsonObject()));
+		y = drawToggleCard(ctx, x, y, w, "Show FOV Circle on HUD",
+				s.aimShowFovCircle, clipTop, clipBot, mx, my, () -> sendAction("toggle_aim_fov_circle", new JsonObject()));
+		y = drawToggleCard(ctx, x, y, w, "Aim Visible Only (Tidak Tembus Dinding)",
+				s.aimVisibleOnly, clipTop, clipBot, mx, my, () -> sendAction("toggle_aim_visible", new JsonObject()));
+		y = drawToggleCard(ctx, x, y, w, "Active Only When Holding Weapon / Tool",
+				s.aimWeaponOnly, clipTop, clipBot, mx, my, () -> sendAction("toggle_aim_weapon_only", new JsonObject()));
+
+		y += 3;
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "FOV CIRCLE, REACH & SMOOTHNESS");
+		y += 16;
+
+		y = drawSliderCard(ctx, "aim_fov_deg", x, y, w, "FOV Circle Size",
+				s.aimFovDegrees + "°", s.aimFovDegrees, 5, 90, clipTop, clipBot, mx, my,
+				v -> s.aimFovDegrees = v,
+				v -> {
+					s.aimFovDegrees = v;
+					sendIntAction("set_aim_fov", v);
+				});
+
+		y = drawSliderCard(ctx, "aim_reach_blk", x, y, w, "Melee Aim Reach (Ranged Auto 52m)",
+				s.aimMaxReach + " Blocks", s.aimMaxReach, 3, 16, clipTop, clipBot, mx, my,
+				v -> s.aimMaxReach = v,
+				v -> {
+					s.aimMaxReach = v;
+					sendIntAction("set_aim_reach", v);
+				});
+
+		String spdBadge = s.aimSmoothSpeed >= 98 ? "Instant (100%)" : (s.aimSmoothSpeed + "% Smooth");
+		y = drawSliderCard(ctx, "aim_smooth_spd", x, y, w, "Aimbot Camera Lock Speed",
+				spdBadge, s.aimSmoothSpeed, 5, 100, clipTop, clipBot, mx, my,
+				v -> s.aimSmoothSpeed = v,
+				v -> {
+					s.aimSmoothSpeed = v;
+					sendIntAction("set_aim_speed", v);
+				});
+
+		y += 3;
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "MOB PROTECTION (JANGAN KENA)");
+		y += 16;
+
+		y = drawToggleCard(ctx, x, y, w, "Protect Pets & Tamed (Wolf, Cat, Horse)",
+				s.aimProtectPets, clipTop, clipBot, mx, my, () -> sendAimProtectToggle("pets"));
+		y = drawToggleCard(ctx, x, y, w, "Protect Villagers, Traders & Golems",
+				s.aimProtectVillagers, clipTop, clipBot, mx, my, () -> sendAimProtectToggle("villagers"));
+		y = drawToggleCard(ctx, x, y, w, "Protect Passive / Farm Animals",
+				s.aimProtectPassive, clipTop, clipBot, mx, my, () -> sendAimProtectToggle("passive"));
+		y = drawToggleCard(ctx, x, y, w, "Protect Unprovoked Neutral (Piglin, Enderman)",
+				s.aimProtectNeutral, clipTop, clipBot, mx, my, () -> sendAimProtectToggle("neutral"));
+		y = drawToggleCard(ctx, x, y, w, "Protect Named Mobs (Name Tag)",
+				s.aimProtectNamed, clipTop, clipBot, mx, my, () -> sendAimProtectToggle("named"));
+		y = drawToggleCard(ctx, x, y, w, "Protect Other Players",
+				s.aimProtectPlayers, clipTop, clipBot, mx, my, () -> sendAimProtectToggle("players"));
+
+		y += 4;
+		int customExclCount = s.aimExcludedMobs == null ? 0 : s.aimExcludedMobs.size();
+		CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w,
+				"CUSTOM MOB EXCLUSION LIST (" + customExclCount + " Protected)");
+		y += 16;
+
+		// Filter bar: [All] | [Protected] | [Friendly/Neutral] | [Hostile] + [Clear]
+		String[] grpLabels = { "All", "Protected", "Neutral", "Hostile" };
+		int clearW = 46;
+		int gGap = 3;
+		int availW = w - clearW - gGap;
+		int gW = (availW - gGap * (grpLabels.length - 1)) / grpLabels.length;
+		int gx = x;
+		for (int gi = 0; gi < grpLabels.length; gi++) {
+			int bw = (gi == grpLabels.length - 1) ? (x + availW - gx) : gW;
+			boolean act = (s.aimMobGroupFilter == gi);
+			boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, gx, y, bw, 15);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, gx, y, bw, 15,
+					trimToWidth(grpLabels[gi], bw - 4), act, hov);
+			final int chosen = gi;
+			addClippedClick(gx, y, bw, 15, clipTop, clipBot, () -> s.aimMobGroupFilter = chosen);
+			gx += bw + gGap;
+		}
+		drawActionBtn(ctx, x + w - clearW, y, clearW, 15, "Clear", 0xFF5A1D28, clipTop, clipBot, mx, my,
+				() -> sendAction("clear_aim_mob_excludes", new JsonObject()));
+		y += 19;
+
+		String q = this.searchQuery == null ? "" : this.searchQuery.trim().toLowerCase(Locale.ROOT);
+		int shown = 0;
+		for (ClientStateSnapshot.AimMobItem mob : s.aimMobCatalog) {
+			if (s.aimMobGroupFilter == 1 && !mob.excluded) continue;
+			if (s.aimMobGroupFilter == 2 && !"friendly".equals(mob.group) && !"neutral".equals(mob.group) && !"passive".equals(mob.group)) {
+				continue;
+			}
+			if (s.aimMobGroupFilter == 3 && !"hostile".equals(mob.group)) continue;
+			if (!q.isEmpty() && !mob.name.toLowerCase(Locale.ROOT).contains(q) && !mob.id.toLowerCase(Locale.ROOT).contains(q)) {
+				continue;
+			}
+			shown++;
+
+			int rowH = 22;
+			boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, w, rowH);
+			int accent = mob.excluded ? CrimsonTheme.EMERALD : 0;
+			CrimsonTheme.drawCard(ctx, x, y, w, rowH, hov, accent);
+
+			String btnLbl = mob.excluded ? "Allow" : "Protect";
+			int btnCol = mob.excluded ? 0xFF2D5B88 : 0xFF245B42;
+			int btnW = Math.max(46, textRenderer.getWidth(btnLbl) + 10);
+			drawActionBtn(ctx, x + w - btnW - 4, y + 3, btnW, 16, btnLbl, btnCol, clipTop, clipBot, mx, my, () -> {
+				JsonObject o = new JsonObject();
+				o.addProperty("id", mob.id);
+				sendAction("toggle_aim_mob_exclude", o);
+			});
+
+			String statusTag = mob.excluded ? "JANGAN KENA" : mob.group.toUpperCase(Locale.ROOT);
+			int tagCol = mob.excluded ? CrimsonTheme.EMERALD
+					: ("hostile".equals(mob.group) ? CrimsonTheme.CRIMSON_BRIGHT
+							: ("neutral".equals(mob.group) ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_SECONDARY));
+			int tagW = textRenderer.getWidth(statusTag) + 8;
+			int tagX = x + w - btnW - tagW - 9;
+			CrimsonTheme.drawBadge(ctx, textRenderer, tagX, y + 5, statusTag,
+					CrimsonTheme.withAlpha(tagCol, 40), tagCol, tagCol);
+
+			int nameMaxW = Math.max(40, tagX - (x + 8) - 4);
+			ctx.drawTextWithShadow(textRenderer, trimToWidth(mob.name, nameMaxW), x + 8, y + 7,
+					mob.excluded ? CrimsonTheme.EMERALD : CrimsonTheme.TEXT_PRIMARY);
+
+			y += rowH + 3;
+		}
+
+		if (shown == 0) {
+			CrimsonTheme.drawCard(ctx, x, y, w, 22, false, 0);
+			ctx.drawTextWithShadow(textRenderer, "No matching mobs in filter.", x + 8, y + 7, CrimsonTheme.TEXT_MUTED);
+			y += 25;
+		}
+		return y;
+	}
+
+	private static void sendAimProtectToggle(String key) {
+		JsonObject o = new JsonObject();
+		o.addProperty("key", key);
+		sendAction("toggle_aim_protect", o);
 	}
 
 	private static String formatWeaponStat(double val) {
@@ -3848,8 +4000,9 @@ public class HardcoreDashboardScreen extends Screen {
 			case 1 -> s.veinMiner || s.treeCapitator || s.veinAutoSmelt;
 			case 2 -> s.sneakGrow;
 			case 3 -> s.orePlusEnabled;
-			case 4 -> (s.weaponStudioEnabled && (Math.abs(s.globalWeaponMultiplier - 1.0) > 1e-4
-					|| s.weaponCatalog.stream().anyMatch(w -> w.overridden)))
+			case 4 -> s.aimbotEnabled || s.aimSilentEnabled
+					|| (s.weaponStudioEnabled && (Math.abs(s.globalWeaponMultiplier - 1.0) > 1e-4
+							|| s.weaponCatalog.stream().anyMatch(w -> w.overridden)))
 					|| s.bagWeapons.stream().anyMatch(b -> b.customItem);
 			case 5 -> s.bypassEnchantConflicts;
 			default -> false;

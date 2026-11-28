@@ -323,6 +323,106 @@ public final class ActionDispatcher {
 				toast = "↺ All Weapon Overrides & Multiplier Reset to Vanilla";
 			}
 
+			// Combat Aim (Aimbot, Silent Aim, FOV Circle, Visibility & Mob Exclusion Filter)
+			case "silent_melee_hit" -> {
+				CombatAimFeature.executeSilentMeleeStrike(player, getInt(obj, "targetId", -1));
+				return;
+			}
+			case "toggle_aimbot" -> {
+				profile.aimbotEnabled = !profile.aimbotEnabled;
+				HardcoreStateManager.save(server);
+				toast = "🎯 Aimbot (Camera Lock): " + (profile.aimbotEnabled ? "ON" : "OFF");
+			}
+			case "toggle_aim_silent" -> {
+				profile.aimSilentEnabled = !profile.aimSilentEnabled;
+				HardcoreStateManager.save(server);
+				toast = "🎯 Aim Silent (FOV Hit): " + (profile.aimSilentEnabled ? "ON" : "OFF");
+			}
+			case "toggle_aim_fov_circle" -> {
+				profile.aimShowFovCircle = !profile.aimShowFovCircle;
+				HardcoreStateManager.save(server);
+				toast = "🎯 HUD FOV Circle: " + (profile.aimShowFovCircle ? "SHOWN" : "HIDDEN");
+			}
+			case "toggle_aim_visible" -> {
+				profile.aimVisibleOnly = !profile.aimVisibleOnly;
+				HardcoreStateManager.save(server);
+				toast = "👁 Visible Target Only: " + (profile.aimVisibleOnly ? "ON (Line-of-Sight)" : "OFF (Ignore Walls)");
+			}
+			case "toggle_aim_weapon_only" -> {
+				profile.aimWeaponOnly = !profile.aimWeaponOnly;
+				HardcoreStateManager.save(server);
+				toast = "⚔ Hold Weapon Only: " + (profile.aimWeaponOnly ? "ON" : "OFF");
+			}
+			case "set_aim_fov" -> {
+				profile.aimFovDegrees = getInt(obj, "value", profile.aimFovDegrees);
+				profile.sanitize();
+				HardcoreStateManager.save(server);
+				toast = "🎯 FOV Circle Radius: " + profile.aimFovDegrees + "°";
+			}
+			case "set_aim_speed" -> {
+				profile.aimSmoothSpeed = getInt(obj, "value", profile.aimSmoothSpeed);
+				profile.sanitize();
+				HardcoreStateManager.save(server);
+				toast = "🎯 Aimbot Lock Speed: " + profile.aimSmoothSpeed + "%";
+			}
+			case "set_aim_reach" -> {
+				profile.aimMaxReach = getInt(obj, "value", profile.aimMaxReach);
+				profile.sanitize();
+				HardcoreStateManager.save(server);
+				toast = "🎯 Melee Aim Reach: " + profile.aimMaxReach + " blocks";
+			}
+			case "toggle_aim_protect" -> {
+				String key = getStr(obj, "key", "");
+				switch (key) {
+					case "pets" -> {
+						profile.aimProtectPets = !profile.aimProtectPets;
+						toast = "🛡 Protect Pets & Tamed: " + (profile.aimProtectPets ? "ON" : "OFF");
+					}
+					case "villagers" -> {
+						profile.aimProtectVillagers = !profile.aimProtectVillagers;
+						toast = "🛡 Protect Villagers & Golems: " + (profile.aimProtectVillagers ? "ON" : "OFF");
+					}
+					case "passive" -> {
+						profile.aimProtectPassive = !profile.aimProtectPassive;
+						toast = "🛡 Protect Passive Animals: " + (profile.aimProtectPassive ? "ON" : "OFF");
+					}
+					case "neutral" -> {
+						profile.aimProtectNeutral = !profile.aimProtectNeutral;
+						toast = "🛡 Protect Unprovoked Neutral: " + (profile.aimProtectNeutral ? "ON" : "OFF");
+					}
+					case "named" -> {
+						profile.aimProtectNamed = !profile.aimProtectNamed;
+						toast = "🛡 Protect Named Mobs: " + (profile.aimProtectNamed ? "ON" : "OFF");
+					}
+					case "players" -> {
+						profile.aimProtectPlayers = !profile.aimProtectPlayers;
+						toast = "🛡 Protect Players: " + (profile.aimProtectPlayers ? "ON" : "OFF");
+					}
+				}
+				HardcoreStateManager.save(server);
+			}
+			case "toggle_aim_mob_exclude" -> {
+				String mobId = getStr(obj, "id", "").trim();
+				Identifier parsed = Identifier.tryParse(mobId);
+				if (parsed != null && Registries.ENTITY_TYPE.containsId(parsed)) {
+					String norm = parsed.toString();
+					String mobName = Registries.ENTITY_TYPE.get(parsed).getName().getString();
+					if (profile.aimExcludedMobs.contains(norm)) {
+						profile.aimExcludedMobs.remove(norm);
+						toast = "⚔ Allowed Target: " + mobName;
+					} else {
+						profile.aimExcludedMobs.add(norm);
+						toast = "🛡 Protected (Jangan Kena): " + mobName;
+					}
+					HardcoreStateManager.save(server);
+				}
+			}
+			case "clear_aim_mob_excludes" -> {
+				profile.aimExcludedMobs.clear();
+				HardcoreStateManager.save(server);
+				toast = "↺ Custom Mob Exclusion List Cleared";
+			}
+
 			case "select_enchant_slot" -> {
 				profile.selectedEnchantSlot = getInt(obj, "slot", -1);
 				toast = "";

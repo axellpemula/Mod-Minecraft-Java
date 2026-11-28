@@ -7,7 +7,8 @@
 		"CameraMixin",
 		"ClientWorldPropertiesAccessor",
 		"GameRendererMixin",
-		"LightmapTextureManagerMixin"
+		"LightmapTextureManagerMixin",
+		"MinecraftClientAimMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

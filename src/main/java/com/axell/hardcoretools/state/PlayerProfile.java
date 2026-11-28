@@ -42,6 +42,23 @@ public class PlayerProfile {
 	public transient long lastUpgradeRollSeq = 0L;
 	public transient ItemUpgraderFeature.RollOutcome pendingRollOutcome = null;
 
+	// Combat Aim (Aimbot, Silent Aim, FOV Circle, Line-of-Sight & Mob Exclusion Filter)
+	public boolean aimbotEnabled = false;
+	public boolean aimSilentEnabled = false;
+	public boolean aimShowFovCircle = true;
+	public boolean aimVisibleOnly = true;
+	public boolean aimWeaponOnly = true;
+	public int aimFovDegrees = 30;   // 5..90 degrees half-angle cone
+	public int aimSmoothSpeed = 50;  // 5..100 (100 = instant lock)
+	public int aimMaxReach = 6;      // 3..16 blocks melee reach (ranged auto up to 48m)
+	public boolean aimProtectPets = true;
+	public boolean aimProtectVillagers = true;
+	public boolean aimProtectPassive = true;
+	public boolean aimProtectNeutral = false;
+	public boolean aimProtectNamed = true;
+	public boolean aimProtectPlayers = true;
+	public List<String> aimExcludedMobs = new ArrayList<>();
+
 	// Misc & UI Theme
 	public int uiTheme = 0; // 0=Crimson Obsidian, 1=Witch's Amethyst, 2=Cyber Emerald, 3=Solar Gold, 4=Arctic Sapphire
 	public boolean welcomed = false;
@@ -65,6 +82,14 @@ public class PlayerProfile {
 		if (Double.isNaN(upgraderPity) || upgraderPity < 0.0) upgraderPity = 0.0;
 		if (upgraderPity > 100.0) upgraderPity = 100.0;
 		if (upgraderFailStreak < 0) upgraderFailStreak = 0;
+		if (aimFovDegrees < 5) aimFovDegrees = 5;
+		if (aimFovDegrees > 90) aimFovDegrees = 90;
+		if (aimSmoothSpeed < 5) aimSmoothSpeed = 5;
+		if (aimSmoothSpeed > 100) aimSmoothSpeed = 100;
+		if (aimMaxReach < 3) aimMaxReach = 3;
+		if (aimMaxReach > 16) aimMaxReach = 16;
+		if (aimExcludedMobs == null) aimExcludedMobs = new ArrayList<>();
+		aimExcludedMobs.removeIf(s -> s == null || s.isBlank());
 		if (waypoints == null) waypoints = new ArrayList<>();
 	}
 }

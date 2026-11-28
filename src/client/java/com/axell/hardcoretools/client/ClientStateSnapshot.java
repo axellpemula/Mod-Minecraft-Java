@@ -1,12 +1,15 @@
 package com.axell.hardcoretools.client;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.axell.hardcoretools.client.gui.CrimsonTheme;
 import com.axell.hardcoretools.client.gui.HardcoreDashboardScreen;
+import com.axell.hardcoretools.feature.CombatAimFeature;
 import com.axell.hardcoretools.state.HardcoreStateManager;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -60,6 +63,13 @@ public class ClientStateSnapshot {
 		public double currentSpeed = 1.6;
 		public boolean customItem = false;
 		public boolean catalogOverridden = false;
+	}
+
+	public static class AimMobItem {
+		public String id = "";
+		public String name = "";
+		public String group = "hostile";
+		public boolean excluded = false;
 	}
 
 	public static class WaypointItem {
@@ -141,6 +151,52 @@ public class ClientStateSnapshot {
 	public String selectedWeaponSlotLabel = "None";
 	public List<BagWeaponItem> bagWeapons = new ArrayList<>();
 	public List<WeaponCatalogItem> weaponCatalog = new ArrayList<>();
+
+	// Combat Aim UI & Synced State
+	public boolean serverModSynced = false;
+	public boolean aimbotEnabled = false;
+	public boolean aimSilentEnabled = false;
+	public boolean aimShowFovCircle = true;
+	public boolean aimVisibleOnly = true;
+	public boolean aimWeaponOnly = true;
+	public int aimFovDegrees = 30;
+	public int aimSmoothSpeed = 50;
+	public int aimMaxReach = 6;
+	public boolean aimProtectPets = true;
+	public boolean aimProtectVillagers = true;
+	public boolean aimProtectPassive = true;
+	public boolean aimProtectNeutral = false;
+	public boolean aimProtectNamed = true;
+	public boolean aimProtectPlayers = true;
+	public Set<String> aimExcludedMobs = new HashSet<>();
+	public List<AimMobItem> aimMobCatalog = new ArrayList<>();
+	public int aimMobGroupFilter = 0; // 0=All, 1=Excluded, 2=Friendly/Neutral, 3=Hostile
+
+	public CombatAimFeature.AimConfig toAimConfig() {
+		return new CombatAimFeature.AimConfig(
+				aimbotEnabled,
+				aimSilentEnabled,
+				aimShowFovCircle,
+				aimVisibleOnly,
+				aimWeaponOnly,
+				aimFovDegrees,
+				aimSmoothSpeed,
+				aimMaxReach,
+				aimProtectPets,
+				aimProtectVillagers,
+				aimProtectPassive,
+				aimProtectNeutral,
+				aimProtectNamed,
+				aimProtectPlayers,
+				aimExcludedMobs
+		);
+	}
+
+	public synchronized void resetOnDisconnect() {
+		this.serverModSynced = false;
+		this.aimbotEnabled = false;
+		this.aimSilentEnabled = false;
+	}
 
 	// Toast banner
 	public String toastText = "";
@@ -347,6 +403,47 @@ public class ClientStateSnapshot {
 					nextCat.add(wc);
 				}
 				this.weaponCatalog = nextCat;
+			}
+
+			this.serverModSynced = true;
+			this.aimbotEnabled = bool(r, "aimbotEnabled", aimbotEnabled);
+			this.aimSilentEnabled = bool(r, "aimSilentEnabled", aimSilentEnabled);
+			this.aimShowFovCircle = bool(r, "aimShowFovCircle", aimShowFovCircle);
+			this.aimVisibleOnly = bool(r, "aimVisibleOnly", aimVisibleOnly);
+			this.aimWeaponOnly = bool(r, "aimWeaponOnly", aimWeaponOnly);
+			this.aimFovDegrees = numInt(r, "aimFovDegrees", aimFovDegrees);
+			this.aimSmoothSpeed = numInt(r, "aimSmoothSpeed", aimSmoothSpeed);
+			this.aimMaxReach = numInt(r, "aimMaxReach", aimMaxReach);
+			this.aimProtectPets = bool(r, "aimProtectPets", aimProtectPets);
+			this.aimProtectVillagers = bool(r, "aimProtectVillagers", aimProtectVillagers);
+			this.aimProtectPassive = bool(r, "aimProtectPassive", aimProtectPassive);
+			this.aimProtectNeutral = bool(r, "aimProtectNeutral", aimProtectNeutral);
+			this.aimProtectNamed = bool(r, "aimProtectNamed", aimProtectNamed);
+			this.aimProtectPlayers = bool(r, "aimProtectPlayers", aimProtectPlayers);
+
+			if (r.has("aimExcludedMobs") && r.get("aimExcludedMobs").isJsonArray()) {
+				Set<String> nextExcl = new HashSet<>();
+				for (JsonElement el : r.get("aimExcludedMobs").getAsJsonArray()) {
+					if (!el.isJsonNull()) {
+						nextExcl.add(el.getAsString());
+					}
+				}
+				this.aimExcludedMobs = nextExcl;
+			}
+
+			if (r.has("aimMobCatalog") && r.get("aimMobCatalog").isJsonArray()) {
+				List<AimMobItem> nextMobs = new ArrayList<>();
+				for (JsonElement el : r.get("aimMobCatalog").getAsJsonArray()) {
+					if (!el.isJsonObject()) continue;
+					JsonObject mo = el.getAsJsonObject();
+					AimMobItem mi = new AimMobItem();
+					mi.id = str(mo, "id", "");
+					mi.name = str(mo, "name", mi.id);
+					mi.group = str(mo, "group", "hostile");
+					mi.excluded = bool(mo, "excluded", false);
+					nextMobs.add(mi);
+				}
+				this.aimMobCatalog = nextMobs;
 			}
 
 			this.bypassEnchantConflicts = bool(r, "bypassEnchantConflicts", bypassEnchantConflicts);

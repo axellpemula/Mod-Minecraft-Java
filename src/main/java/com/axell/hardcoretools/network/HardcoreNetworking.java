@@ -1,9 +1,12 @@
 package com.axell.hardcoretools.network;
 
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.axell.hardcoretools.HardcoreToolsMod;
 import com.axell.hardcoretools.feature.ActionDispatcher;
+import com.axell.hardcoretools.feature.CombatAimFeature;
 import com.axell.hardcoretools.feature.EnchantFeature;
 import com.axell.hardcoretools.feature.ProtectionHandler;
 import com.axell.hardcoretools.feature.WeaponDamageFeature;
@@ -244,6 +247,40 @@ public final class HardcoreNetworking {
 			weaponCatArr.add(wo);
 		}
 		root.add("weaponCatalog", weaponCatArr);
+
+		// Combat Aim (Aimbot, Silent Aim, FOV Circle, Line-of-Sight & Mob Exclusion Filter)
+		root.addProperty("aimbotEnabled", profile.aimbotEnabled);
+		root.addProperty("aimSilentEnabled", profile.aimSilentEnabled);
+		root.addProperty("aimShowFovCircle", profile.aimShowFovCircle);
+		root.addProperty("aimVisibleOnly", profile.aimVisibleOnly);
+		root.addProperty("aimWeaponOnly", profile.aimWeaponOnly);
+		root.addProperty("aimFovDegrees", profile.aimFovDegrees);
+		root.addProperty("aimSmoothSpeed", profile.aimSmoothSpeed);
+		root.addProperty("aimMaxReach", profile.aimMaxReach);
+		root.addProperty("aimProtectPets", profile.aimProtectPets);
+		root.addProperty("aimProtectVillagers", profile.aimProtectVillagers);
+		root.addProperty("aimProtectPassive", profile.aimProtectPassive);
+		root.addProperty("aimProtectNeutral", profile.aimProtectNeutral);
+		root.addProperty("aimProtectNamed", profile.aimProtectNamed);
+		root.addProperty("aimProtectPlayers", profile.aimProtectPlayers);
+
+		Set<String> exclSet = profile.aimExcludedMobs == null ? Set.of() : new HashSet<>(profile.aimExcludedMobs);
+		JsonArray exclArr = new JsonArray();
+		for (String eid : exclSet) {
+			exclArr.add(eid);
+		}
+		root.add("aimExcludedMobs", exclArr);
+
+		JsonArray mobCatArr = new JsonArray();
+		for (CombatAimFeature.MobFilterEntry mfe : CombatAimFeature.collectMobCatalog(exclSet)) {
+			JsonObject mo = new JsonObject();
+			mo.addProperty("id", mfe.id());
+			mo.addProperty("name", mfe.name());
+			mo.addProperty("group", mfe.group());
+			mo.addProperty("excluded", mfe.excluded());
+			mobCatArr.add(mo);
+		}
+		root.add("aimMobCatalog", mobCatArr);
 
 		// Enchantment Studio & Target Item details (Armor / Offhand / Hotbar / Backpack)
 		root.addProperty("bypassEnchantConflicts", profile.bypassEnchantConflicts);
