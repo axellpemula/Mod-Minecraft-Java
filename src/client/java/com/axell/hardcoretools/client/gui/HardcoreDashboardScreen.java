@@ -45,7 +45,7 @@ import net.minecraft.util.math.RotationAxis;
 
 public class HardcoreDashboardScreen extends Screen {
 	private static final Identifier EMBLEM_TEX = Identifier.of(HardcoreToolsMod.MOD_ID, "textures/gui/emblem.png");
-	private static final String MOD_VERSION = "v1.7.5";
+	private static final String MOD_VERSION = "v1.7.1";
 	private static final String DEVELOPER_NAME = "xVoid Axell";
 	private static boolean infoLangIndonesian = true;
 
@@ -91,8 +91,8 @@ public class HardcoreDashboardScreen extends Screen {
 					"Memicu Totem of Undying langsung dari slot tas mana pun saat terkena serangan mematikan, mengisi ulang offhand otomatis (Auto-Refill), dan memicu Totem lebih awal saat HP kritis (Low-HP Panic Saver).",
 					"Pops Totems of Undying directly from any inventory slot on lethal hits, auto-restocks your offhand, and pre-emptively triggers a Totem when HP drops below threshold."),
 			new InfoEntry(icon("rbd"), "Return by Death", "Protection", 0xFFC86BFF,
-					"Mencegah kematian permanen Hardcore setelah Totem habis lalu memutar balik waktu dunia hingga -60 detik (koreografi 20 detik: karakter rebah & item terpental, kaca layar retak & pecah, lalu dunia monokrom fast-reverse memulihkan blok, mob, langit, posisi, dan isi tas).",
-					"Intercepts fatal Hardcore deaths when no Totems remain and rewinds up to 60 seconds of world state over a 20s sequence—restoring broken blocks, mobs, sky time, position, and full inventory."),
+					"Mencegah kematian permanen Hardcore setelah Totem habis lalu memutar balik waktu dunia hingga -60 detik (koreografi 17.5 detik: karakter rebah & item terpental, kaca layar retak & pecah, lalu dunia monokrom fast-reverse memulihkan blok, mob, langit, posisi, dan isi tas).",
+					"Intercepts fatal Hardcore deaths when no Totems remain and rewinds up to 60 seconds of world state over a 17.5s sequence—restoring broken blocks, mobs, sky time, position, and full inventory."),
 			new InfoEntry(icon("veinminer"), "Vein Miner & Tree Capitator", "World & Ore", 0xFF38C9FF,
 					"Menghancurkan satu urat bijih sekaligus dengan Pickaxe dan menebang pohon alami utuh dengan Axe tanpa merusak bangunan kayu. Dilengkapi Auto-Collect, Auto-Smelt Ores, dan Instant Leaf Decay pintar.",
 					"Breaks connected ore veins in one swing with a Pickaxe and fells natural trees with an Axe while ignoring player builds. Includes Auto-Collect, Auto-Smelt Ores, and smart single-tree Instant Leaf Decay."),
