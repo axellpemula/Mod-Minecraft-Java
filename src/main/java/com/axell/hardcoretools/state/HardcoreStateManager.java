@@ -30,6 +30,10 @@ public final class HardcoreStateManager {
 		public boolean orePlusEnabled = false;
 		public int orePlusMultiplier = 2;
 		public Map<String, Boolean> oreToggles = new LinkedHashMap<>();
+		public boolean weaponStudioEnabled = true;
+		public double globalWeaponMultiplier = 1.0;
+		public Map<String, Double> weaponDamageOverrides = new LinkedHashMap<>();
+		public Map<String, Double> weaponSpeedOverrides = new LinkedHashMap<>();
 		public Map<String, PlayerProfile> players = new LinkedHashMap<>();
 
 		public void sanitize() {
@@ -39,6 +43,20 @@ public final class HardcoreStateManager {
 			for (String key : ALL_ORE_KEYS) {
 				oreToggles.putIfAbsent(key, true);
 			}
+			if (Double.isNaN(globalWeaponMultiplier) || Double.isInfinite(globalWeaponMultiplier) || globalWeaponMultiplier < 0.0) {
+				globalWeaponMultiplier = 1.0;
+			}
+			if (globalWeaponMultiplier > 10000.0) {
+				globalWeaponMultiplier = 10000.0;
+			}
+			if (weaponDamageOverrides == null) weaponDamageOverrides = new LinkedHashMap<>();
+			weaponDamageOverrides.entrySet().removeIf(e ->
+					e.getKey() == null || e.getValue() == null
+					|| Double.isNaN(e.getValue()) || Double.isInfinite(e.getValue()) || e.getValue() < 0.0);
+			if (weaponSpeedOverrides == null) weaponSpeedOverrides = new LinkedHashMap<>();
+			weaponSpeedOverrides.entrySet().removeIf(e ->
+					e.getKey() == null || e.getValue() == null
+					|| Double.isNaN(e.getValue()) || Double.isInfinite(e.getValue()) || e.getValue() <= 0.0);
 			if (players == null) players = new LinkedHashMap<>();
 			for (PlayerProfile profile : players.values()) {
 				if (profile != null) {

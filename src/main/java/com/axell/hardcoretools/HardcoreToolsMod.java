@@ -8,6 +8,7 @@ import com.axell.hardcoretools.feature.ProtectionHandler;
 import com.axell.hardcoretools.feature.ReturnByDeathFeature;
 import com.axell.hardcoretools.feature.SneakGrowHandler;
 import com.axell.hardcoretools.feature.VeinMinerHandler;
+import com.axell.hardcoretools.feature.WeaponDamageFeature;
 import com.axell.hardcoretools.network.HardcoreNetworking;
 import com.axell.hardcoretools.state.HardcoreStateManager;
 import com.axell.hardcoretools.state.PlayerProfile;
@@ -34,11 +35,13 @@ public class HardcoreToolsMod implements ModInitializer {
 		ReturnByDeathFeature.register();
 		VeinMinerHandler.register();
 		SneakGrowHandler.register();
+		WeaponDamageFeature.register();
 
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
 			ServerPlayerEntity player = handler.getPlayer();
 			server.execute(() -> {
 				PlayerProfile profile = HardcoreStateManager.getProfile(player);
+				WeaponDamageFeature.syncPlayerInventory(player, HardcoreStateManager.get(server));
 				if (profile.returnByDeath) {
 					ReturnByDeathFeature.captureImmediateBaseline(player);
 				}

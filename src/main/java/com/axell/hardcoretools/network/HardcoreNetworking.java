@@ -1,11 +1,15 @@
 package com.axell.hardcoretools.network;
 
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.axell.hardcoretools.HardcoreToolsMod;
 import com.axell.hardcoretools.feature.ActionDispatcher;
+import com.axell.hardcoretools.feature.CombatAimFeature;
 import com.axell.hardcoretools.feature.EnchantFeature;
 import com.axell.hardcoretools.feature.ProtectionHandler;
+import com.axell.hardcoretools.feature.WeaponDamageFeature;
 import com.axell.hardcoretools.state.HardcoreStateManager;
 import com.axell.hardcoretools.state.PlayerProfile;
 import com.axell.hardcoretools.state.WaypointEntry;
@@ -202,6 +206,81 @@ public final class HardcoreNetworking {
 			oresObj.addProperty(k, Boolean.TRUE.equals(worldData.oreToggles.getOrDefault(k, true)));
 		}
 		root.add("ores", oresObj);
+
+		// Live Weapon Damage Studio (Global All-Weapons Catalog + Per-Item Bag Forge)
+		WeaponDamageFeature.syncPlayerInventory(player, worldData);
+		root.addProperty("weaponStudioEnabled", worldData.weaponStudioEnabled);
+		root.addProperty("globalWeaponMultiplier", worldData.globalWeaponMultiplier);
+		int resolvedWeaponSlot = WeaponDamageFeature.resolveSelectedWeaponSlot(player, profile.selectedWeaponSlot);
+		profile.selectedWeaponSlot = resolvedWeaponSlot;
+		root.addProperty("selectedWeaponSlot", resolvedWeaponSlot);
+		root.addProperty("selectedWeaponSlotLabel", EnchantFeature.describeSlot(player, resolvedWeaponSlot));
+
+		JsonArray bagWeaponsArr = new JsonArray();
+		for (WeaponDamageFeature.BagWeaponEntry bwe : WeaponDamageFeature.collectBagWeapons(player)) {
+			JsonObject bo = new JsonObject();
+			bo.addProperty("slot", bwe.slot());
+			bo.addProperty("tag", bwe.tag());
+			bo.addProperty("itemId", bwe.itemId());
+			bo.addProperty("name", bwe.name());
+			bo.addProperty("vanillaDamage", bwe.vanillaDamage());
+			bo.addProperty("vanillaSpeed", bwe.vanillaSpeed());
+			bo.addProperty("currentDamage", bwe.currentDamage());
+			bo.addProperty("currentSpeed", bwe.currentSpeed());
+			bo.addProperty("customItem", bwe.customItem());
+			bo.addProperty("catalogOverridden", bwe.catalogOverridden());
+			bagWeaponsArr.add(bo);
+		}
+		root.add("bagWeapons", bagWeaponsArr);
+
+		JsonArray weaponCatArr = new JsonArray();
+		for (WeaponDamageFeature.CatalogWeaponEntry cwe : WeaponDamageFeature.collectWeaponCatalog(worldData)) {
+			JsonObject wo = new JsonObject();
+			wo.addProperty("id", cwe.id());
+			wo.addProperty("name", cwe.name());
+			wo.addProperty("category", cwe.category());
+			wo.addProperty("vanillaDamage", cwe.vanillaDamage());
+			wo.addProperty("vanillaSpeed", cwe.vanillaSpeed());
+			wo.addProperty("activeDamage", cwe.activeDamage());
+			wo.addProperty("activeSpeed", cwe.activeSpeed());
+			wo.addProperty("overridden", cwe.overridden());
+			weaponCatArr.add(wo);
+		}
+		root.add("weaponCatalog", weaponCatArr);
+
+		// Combat Aim (Aimbot, Silent Aim, FOV Circle, Line-of-Sight & Mob Exclusion Filter)
+		root.addProperty("aimbotEnabled", profile.aimbotEnabled);
+		root.addProperty("aimSilentEnabled", profile.aimSilentEnabled);
+		root.addProperty("aimShowFovCircle", profile.aimShowFovCircle);
+		root.addProperty("aimVisibleOnly", profile.aimVisibleOnly);
+		root.addProperty("aimWeaponOnly", profile.aimWeaponOnly);
+		root.addProperty("aimFovDegrees", profile.aimFovDegrees);
+		root.addProperty("aimSmoothSpeed", profile.aimSmoothSpeed);
+		root.addProperty("aimMaxReach", profile.aimMaxReach);
+		root.addProperty("aimProtectPets", profile.aimProtectPets);
+		root.addProperty("aimProtectVillagers", profile.aimProtectVillagers);
+		root.addProperty("aimProtectPassive", profile.aimProtectPassive);
+		root.addProperty("aimProtectNeutral", profile.aimProtectNeutral);
+		root.addProperty("aimProtectNamed", profile.aimProtectNamed);
+		root.addProperty("aimProtectPlayers", profile.aimProtectPlayers);
+
+		Set<String> exclSet = profile.aimExcludedMobs == null ? Set.of() : new HashSet<>(profile.aimExcludedMobs);
+		JsonArray exclArr = new JsonArray();
+		for (String eid : exclSet) {
+			exclArr.add(eid);
+		}
+		root.add("aimExcludedMobs", exclArr);
+
+		JsonArray mobCatArr = new JsonArray();
+		for (CombatAimFeature.MobFilterEntry mfe : CombatAimFeature.collectMobCatalog(exclSet)) {
+			JsonObject mo = new JsonObject();
+			mo.addProperty("id", mfe.id());
+			mo.addProperty("name", mfe.name());
+			mo.addProperty("group", mfe.group());
+			mo.addProperty("excluded", mfe.excluded());
+			mobCatArr.add(mo);
+		}
+		root.add("aimMobCatalog", mobCatArr);
 
 		// Enchantment Studio & Target Item details (Armor / Offhand / Hotbar / Backpack)
 		root.addProperty("bypassEnchantConflicts", profile.bypassEnchantConflicts);

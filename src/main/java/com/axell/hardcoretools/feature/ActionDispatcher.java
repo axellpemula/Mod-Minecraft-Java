@@ -241,6 +241,188 @@ public final class ActionDispatcher {
 			}
 
 			// 5. Enchantments (Vanilla & Over-Enchant Lv. 25 — Armor, Offhand, Hotbar & Bag!)
+			case "toggle_weapon_studio" -> {
+				worldData.weaponStudioEnabled = !worldData.weaponStudioEnabled;
+				HardcoreStateManager.save(server);
+				WeaponDamageFeature.syncAllOnlineInventories(server);
+				toast = "⚔ Live Weapon Damage: " + (worldData.weaponStudioEnabled ? "ENABLED" : "PAUSED (Vanilla)");
+			}
+			case "set_global_weapon_mult" -> {
+				double mult = Math.max(0.0, Math.min(10000.0, Math.round(getDouble(obj, "value", 1.0) * 100.0) / 100.0));
+				worldData.globalWeaponMultiplier = mult;
+				HardcoreStateManager.save(server);
+				toast = String.format(Locale.US, "⚔ Global Weapon Multiplier: %.2fx", mult);
+			}
+			case "select_weapon_slot" -> {
+				profile.selectedWeaponSlot = getInt(obj, "slot", -1);
+				toast = "";
+			}
+			case "apply_bag_weapon" -> {
+				int slot = getInt(obj, "slot", profile.selectedWeaponSlot);
+				double dmg = WeaponDamageFeature.clampDamage(getDouble(obj, "damage", 7.0));
+				double spd = WeaponDamageFeature.clampSpeed(getDouble(obj, "speed", 1.6));
+				ItemStack target = EnchantFeature.getStackAtSlot(player, slot);
+				if (target.isEmpty()) {
+					toast = "No item found in selected slot!";
+					ok = false;
+				} else {
+					String itemName = target.getName().getString();
+					WeaponDamageFeature.applyCustomStatsToSlot(player, slot, dmg, spd);
+					toast = String.format(Locale.US, "⚔ Forged %s → %s DMG · %s SPD",
+							itemName, formatStat(dmg), formatStat(spd));
+				}
+			}
+			case "reset_bag_weapon" -> {
+				int slot = getInt(obj, "slot", profile.selectedWeaponSlot);
+				ItemStack target = EnchantFeature.getStackAtSlot(player, slot);
+				if (target.isEmpty()) {
+					toast = "No item found in selected slot!";
+					ok = false;
+				} else {
+					String itemName = target.getName().getString();
+					WeaponDamageFeature.resetSlotWeaponToDefault(player, slot);
+					toast = "↺ Reset " + itemName + " to default stats";
+				}
+			}
+			case "set_catalog_weapon" -> {
+				String itemId = getStr(obj, "id", "");
+				Identifier parsed = Identifier.tryParse(itemId);
+				if (parsed == null || !Registries.ITEM.containsId(parsed)) {
+					toast = "Unknown weapon ID: " + itemId;
+					ok = false;
+				} else {
+					Double dmg = (obj.has("damage") && !obj.get("damage").isJsonNull())
+							? WeaponDamageFeature.clampDamage(getDouble(obj, "damage", 7.0))
+							: null;
+					Double spd = (obj.has("speed") && !obj.get("speed").isJsonNull())
+							? WeaponDamageFeature.clampSpeed(getDouble(obj, "speed", 1.6))
+							: null;
+					WeaponDamageFeature.setCatalogWeaponOverride(server, parsed.toString(), dmg, spd);
+					String itemName = Registries.ITEM.get(parsed).getName().getString();
+					toast = dmg != null
+							? ("⚔ Live " + itemName + " Damage → " + formatStat(dmg))
+							: ("⚔ Updated " + itemName);
+				}
+			}
+			case "reset_catalog_weapon" -> {
+				String itemId = getStr(obj, "id", "");
+				Identifier parsed = Identifier.tryParse(itemId);
+				if (parsed != null && Registries.ITEM.containsId(parsed)) {
+					WeaponDamageFeature.resetCatalogWeaponOverride(server, parsed.toString());
+					String itemName = Registries.ITEM.get(parsed).getName().getString();
+					toast = "↺ Reset " + itemName + " to Vanilla Damage";
+				} else {
+					WeaponDamageFeature.resetCatalogWeaponOverride(server, itemId);
+					toast = "↺ Reset weapon to Vanilla Damage";
+				}
+			}
+			case "reset_all_catalog_weapons" -> {
+				WeaponDamageFeature.resetAllCatalogOverrides(server);
+				player.getWorld().playSound(null, player.getBlockPos(),
+						SoundEvents.BLOCK_GRINDSTONE_USE, SoundCategory.PLAYERS, 0.85F, 1.0F);
+				toast = "↺ All Weapon Overrides & Multiplier Reset to Vanilla";
+			}
+
+			// Combat Aim (Aimbot, Silent Aim, FOV Circle, Visibility & Mob Exclusion Filter)
+			case "silent_melee_hit" -> {
+				CombatAimFeature.executeSilentMeleeStrike(player, getInt(obj, "targetId", -1));
+				return;
+			}
+			case "toggle_aimbot" -> {
+				profile.aimbotEnabled = !profile.aimbotEnabled;
+				HardcoreStateManager.save(server);
+				toast = "🎯 Aimbot (Camera Lock): " + (profile.aimbotEnabled ? "ON" : "OFF");
+			}
+			case "toggle_aim_silent" -> {
+				profile.aimSilentEnabled = !profile.aimSilentEnabled;
+				HardcoreStateManager.save(server);
+				toast = "🎯 Aim Silent (FOV Hit): " + (profile.aimSilentEnabled ? "ON" : "OFF");
+			}
+			case "toggle_aim_fov_circle" -> {
+				profile.aimShowFovCircle = !profile.aimShowFovCircle;
+				HardcoreStateManager.save(server);
+				toast = "🎯 HUD FOV Circle: " + (profile.aimShowFovCircle ? "SHOWN" : "HIDDEN");
+			}
+			case "toggle_aim_visible" -> {
+				profile.aimVisibleOnly = !profile.aimVisibleOnly;
+				HardcoreStateManager.save(server);
+				toast = "👁 Visible Target Only: " + (profile.aimVisibleOnly ? "ON (Line-of-Sight)" : "OFF (Ignore Walls)");
+			}
+			case "toggle_aim_weapon_only" -> {
+				profile.aimWeaponOnly = !profile.aimWeaponOnly;
+				HardcoreStateManager.save(server);
+				toast = "⚔ Hold Weapon Only: " + (profile.aimWeaponOnly ? "ON" : "OFF");
+			}
+			case "set_aim_fov" -> {
+				profile.aimFovDegrees = getInt(obj, "value", profile.aimFovDegrees);
+				profile.sanitize();
+				HardcoreStateManager.save(server);
+				toast = "🎯 FOV Circle Radius: " + profile.aimFovDegrees + "°";
+			}
+			case "set_aim_speed" -> {
+				profile.aimSmoothSpeed = getInt(obj, "value", profile.aimSmoothSpeed);
+				profile.sanitize();
+				HardcoreStateManager.save(server);
+				toast = "🎯 Aimbot Lock Speed: " + profile.aimSmoothSpeed + "%";
+			}
+			case "set_aim_reach" -> {
+				profile.aimMaxReach = getInt(obj, "value", profile.aimMaxReach);
+				profile.sanitize();
+				HardcoreStateManager.save(server);
+				toast = "🎯 Melee Aim Reach: " + profile.aimMaxReach + " blocks";
+			}
+			case "toggle_aim_protect" -> {
+				String key = getStr(obj, "key", "");
+				switch (key) {
+					case "pets" -> {
+						profile.aimProtectPets = !profile.aimProtectPets;
+						toast = "🛡 Protect Pets & Tamed: " + (profile.aimProtectPets ? "ON" : "OFF");
+					}
+					case "villagers" -> {
+						profile.aimProtectVillagers = !profile.aimProtectVillagers;
+						toast = "🛡 Protect Villagers & Golems: " + (profile.aimProtectVillagers ? "ON" : "OFF");
+					}
+					case "passive" -> {
+						profile.aimProtectPassive = !profile.aimProtectPassive;
+						toast = "🛡 Protect Passive Animals: " + (profile.aimProtectPassive ? "ON" : "OFF");
+					}
+					case "neutral" -> {
+						profile.aimProtectNeutral = !profile.aimProtectNeutral;
+						toast = "🛡 Protect Unprovoked Neutral: " + (profile.aimProtectNeutral ? "ON" : "OFF");
+					}
+					case "named" -> {
+						profile.aimProtectNamed = !profile.aimProtectNamed;
+						toast = "🛡 Protect Named Mobs: " + (profile.aimProtectNamed ? "ON" : "OFF");
+					}
+					case "players" -> {
+						profile.aimProtectPlayers = !profile.aimProtectPlayers;
+						toast = "🛡 Protect Players: " + (profile.aimProtectPlayers ? "ON" : "OFF");
+					}
+				}
+				HardcoreStateManager.save(server);
+			}
+			case "toggle_aim_mob_exclude" -> {
+				String mobId = getStr(obj, "id", "").trim();
+				Identifier parsed = Identifier.tryParse(mobId);
+				if (parsed != null && Registries.ENTITY_TYPE.containsId(parsed)) {
+					String norm = parsed.toString();
+					String mobName = Registries.ENTITY_TYPE.get(parsed).getName().getString();
+					if (profile.aimExcludedMobs.contains(norm)) {
+						profile.aimExcludedMobs.remove(norm);
+						toast = "⚔ Allowed Target: " + mobName;
+					} else {
+						profile.aimExcludedMobs.add(norm);
+						toast = "🛡 Protected (Jangan Kena): " + mobName;
+					}
+					HardcoreStateManager.save(server);
+				}
+			}
+			case "clear_aim_mob_excludes" -> {
+				profile.aimExcludedMobs.clear();
+				HardcoreStateManager.save(server);
+				toast = "↺ Custom Mob Exclusion List Cleared";
+			}
+
 			case "select_enchant_slot" -> {
 				profile.selectedEnchantSlot = getInt(obj, "slot", -1);
 				toast = "";
@@ -770,5 +952,12 @@ public final class ActionDispatcher {
 		} catch (Exception e) {
 			return def;
 		}
+	}
+
+	private static String formatStat(double val) {
+		if (Math.abs(val - Math.rint(val)) < 1e-4) {
+			return Long.toString(Math.round(val));
+		}
+		return String.format(Locale.US, "%.2f", val).replaceAll("0+$", "").replaceAll("\\.$", "");
 	}
 }

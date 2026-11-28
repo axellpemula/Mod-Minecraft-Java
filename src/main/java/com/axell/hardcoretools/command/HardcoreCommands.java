@@ -2,14 +2,17 @@ package com.axell.hardcoretools.command;
 
 import com.axell.hardcoretools.feature.ActionDispatcher;
 import com.axell.hardcoretools.feature.TeleportFeature;
+import com.axell.hardcoretools.feature.WeaponDamageFeature;
 import com.axell.hardcoretools.network.HardcoreNetworking;
 import com.axell.hardcoretools.state.HardcoreStateManager;
 import com.axell.hardcoretools.state.WaypointEntry;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.CommandNode;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -30,6 +33,14 @@ public final class HardcoreCommands {
 						.executes(HardcoreCommands::openDashboard)
 						.then(CommandManager.literal("config").executes(HardcoreCommands::openDashboard))
 						.then(CommandManager.literal("back").executes(HardcoreCommands::warpBack))
+						.then(CommandManager.literal("damage")
+								.then(CommandManager.literal("reset").executes(HardcoreCommands::resetHeldDamage))
+								.then(CommandManager.argument("amount", DoubleArgumentType.doubleArg(0.0, WeaponDamageFeature.MAX_CUSTOM_DAMAGE))
+										.executes(ctx -> setHeldDamage(ctx, DoubleArgumentType.getDouble(ctx, "amount"), null))
+										.then(CommandManager.argument("speed", DoubleArgumentType.doubleArg(WeaponDamageFeature.MIN_CUSTOM_SPEED, WeaponDamageFeature.MAX_CUSTOM_SPEED))
+												.executes(ctx -> setHeldDamage(ctx,
+														DoubleArgumentType.getDouble(ctx, "amount"),
+														DoubleArgumentType.getDouble(ctx, "speed"))))))
 						.then(buildGameModeBranch("gamemode"))
 						.then(buildGameModeBranch("gm"));
 				dispatcher.register(root);
@@ -115,6 +126,58 @@ public final class HardcoreCommands {
 				true
 		);
 		HardcoreNetworking.sendSyncState(player, "", true);
+		return 1;
+	}
+
+	private static int setHeldDamage(CommandContext<ServerCommandSource> ctx, double amount, Double speedOverride) {
+		ServerPlayerEntity player = ctx.getSource().getPlayer();
+		if (player == null) {
+			ctx.getSource().sendError(Text.literal("Only players can customize held weapon damage."));
+			return 0;
+		}
+		if (!HardcoreStateManager.canUseTools(player)) {
+			ctx.getSource().sendError(Text.literal("You do not have permission to use Void Sovereign on this server.").formatted(Formatting.RED));
+			return 0;
+		}
+		int slot = player.getInventory().selectedSlot;
+		ItemStack held = player.getMainHandStack();
+		if (held.isEmpty()) {
+			player.sendMessage(Text.literal("✦ Hold a weapon or item in your main hand first.").formatted(Formatting.RED), true);
+			return 0;
+		}
+		WeaponDamageFeature.WeaponStats cur = WeaponDamageFeature.readCurrentStackStats(
+				held,
+				player.getServer() != null ? HardcoreStateManager.get(player.getServer()) : null
+		);
+		double spd = speedOverride != null ? speedOverride : cur.speed();
+		WeaponDamageFeature.applyCustomStatsToSlot(player, slot, amount, spd);
+		String msg = "⚔ Forged " + held.getName().getString() + " → " + WeaponDamageFeature.clampDamage(amount)
+				+ " DMG · " + WeaponDamageFeature.clampSpeed(spd) + " SPD";
+		player.sendMessage(Text.literal(msg).formatted(Formatting.GOLD), true);
+		HardcoreNetworking.sendSyncState(player, msg, true);
+		return 1;
+	}
+
+	private static int resetHeldDamage(CommandContext<ServerCommandSource> ctx) {
+		ServerPlayerEntity player = ctx.getSource().getPlayer();
+		if (player == null) {
+			ctx.getSource().sendError(Text.literal("Only players can reset held weapon damage."));
+			return 0;
+		}
+		if (!HardcoreStateManager.canUseTools(player)) {
+			ctx.getSource().sendError(Text.literal("You do not have permission to use Void Sovereign on this server.").formatted(Formatting.RED));
+			return 0;
+		}
+		int slot = player.getInventory().selectedSlot;
+		ItemStack held = player.getMainHandStack();
+		if (held.isEmpty()) {
+			player.sendMessage(Text.literal("✦ Hold a weapon or item in your main hand first.").formatted(Formatting.RED), true);
+			return 0;
+		}
+		WeaponDamageFeature.resetSlotWeaponToDefault(player, slot);
+		String msg = "↺ Reset " + held.getName().getString() + " to default stats";
+		player.sendMessage(Text.literal(msg).formatted(Formatting.AQUA), true);
+		HardcoreNetworking.sendSyncState(player, msg, true);
 		return 1;
 	}
 }
