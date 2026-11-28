@@ -1,6 +1,6 @@
 # Void Sovereign — Fabric 1.21.1 Edition
 
-Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema)**, **Live Weapon Damage & Combat Aim Studio (All-Weapons Catalog, Bag Forge, Aimbot & Aim Silent FOV Circle)**, **Quick Radial Wheel (`R`)**, **Arcane Altar Item Upgrader + Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
+Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema, Ultra-Thin Borders)**, **Live Weapon Damage & Combat Aim Studio (All-Weapons Catalog, Bag Forge, Aimbot & Aim Silent FOV Circle)**, **Transparent Quick Radial Wheel (`R`)**, **Arcane Gacha Spin Item Upgrader + Divine Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
 
 ## Persyaratan
 - **Minecraft Java Edition**: `1.21.1`

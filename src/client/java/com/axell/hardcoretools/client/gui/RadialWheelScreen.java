@@ -134,13 +134,7 @@ public class RadialWheelScreen extends Screen {
 
 	@Override
 	public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-		if (this.client != null && this.client.world != null) {
-			try {
-				this.applyBlur(delta);
-			} catch (Exception ignored) {
-			}
-		}
-		context.fillGradient(0, 0, this.width, this.height, 0x7A06040A, 0x9908050D);
+		// Pure transparent background — keeps the live game world 100% visible & clear!
 	}
 
 	@Override
@@ -195,9 +189,9 @@ public class RadialWheelScreen extends Screen {
 
 		Matrix4f mat = ctx.getMatrices().peek().getPositionMatrix();
 
-		// Soft outer ambient ring
-		drawRingSector(mat, cx, cy, (INNER_R - 4.0F) * scale, (OUTER_R + 8.0F) * scale,
-				0.0D, Math.PI * 2.0D, 64, 0x38000000, 0x00000000);
+		// Soft subtle ring shadow only right behind the wheel
+		drawRingSector(mat, cx, cy, (INNER_R - 3.0F) * scale, (OUTER_R + 6.0F) * scale,
+				0.0D, Math.PI * 2.0D, 64, 0x1E000000, 0x00000000);
 
 		double sectorSpan = (Math.PI * 2.0D) / SECTOR_COUNT;
 		double gapRad = Math.toRadians(3.2D);
@@ -210,33 +204,33 @@ public class RadialWheelScreen extends Screen {
 			double a1 = centerAng + sectorSpan * 0.5D - gapRad * 0.5D;
 
 			float rIn = (INNER_R + hAnim * 2.0F) * scale;
-			float rOut = (OUTER_R + hAnim * 9.5F) * scale;
+			float rOut = (OUTER_R + hAnim * 8.5F) * scale;
 
-			int baseIn = CrimsonTheme.withAlpha(CrimsonTheme.BG_CARD, 224);
-			int baseOut = CrimsonTheme.withAlpha(CrimsonTheme.BG_WINDOW, 236);
-			int hovIn = CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_DARK, 238);
-			int hovOut = CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON, 228);
+			int baseIn = CrimsonTheme.withAlpha(CrimsonTheme.BG_CARD, 108);
+			int baseOut = CrimsonTheme.withAlpha(CrimsonTheme.BG_WINDOW, 126);
+			int hovIn = CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON_DARK, 178);
+			int hovOut = CrimsonTheme.withAlpha(CrimsonTheme.CRIMSON, 170);
 
 			int colIn = CrimsonTheme.lerpColor(baseIn, hovIn, hAnim);
 			int colOut = CrimsonTheme.lerpColor(baseOut, hovOut, hAnim);
 
 			drawRingSector(mat, cx, cy, rIn, rOut, a0, a1, 18, colIn, colOut);
 
-			// Outer arc accent rim (lights up when active or hovered)
+			// Thin outer arc accent rim (lights up when active or hovered)
 			int rimCol = info.activeState()
-					? CrimsonTheme.lerpColor(info.stateColor(), 0xFFFFFFFF, hAnim * 0.35F)
-					: CrimsonTheme.lerpColor(CrimsonTheme.BORDER_SUBTLE, CrimsonTheme.CRIMSON_BRIGHT, hAnim);
-			drawRingSector(mat, cx, cy, rOut - 2.2F * scale, rOut, a0, a1, 18, rimCol, rimCol);
+					? CrimsonTheme.lerpColor(CrimsonTheme.withAlpha(info.stateColor(), 215), 0xFFFFFFFF, hAnim * 0.35F)
+					: CrimsonTheme.lerpColor(CrimsonTheme.withAlpha(CrimsonTheme.BORDER_SUBTLE, 145), CrimsonTheme.CRIMSON_BRIGHT, hAnim);
+			drawRingSector(mat, cx, cy, rOut - 1.15F * scale, rOut, a0, a1, 18, rimCol, rimCol);
 
-			// Inner arc subtle trim
-			int inRim = CrimsonTheme.lerpColor(CrimsonTheme.BORDER_SUBTLE, CrimsonTheme.CRIMSON_BRIGHT, hAnim);
-			drawRingSector(mat, cx, cy, rIn, rIn + 1.2F * scale, a0, a1, 18, inRim, inRim);
+			// Thin inner arc subtle trim
+			int inRim = CrimsonTheme.lerpColor(CrimsonTheme.withAlpha(CrimsonTheme.BORDER_SUBTLE, 130), CrimsonTheme.CRIMSON_BRIGHT, hAnim);
+			drawRingSector(mat, cx, cy, rIn, rIn + 0.7F * scale, a0, a1, 18, inRim, inRim);
 		}
 
-		// Central Hub Circle + Glowing Ring
+		// Translucent Central Hub Circle + Thin Rim
 		float hubR = (DEADZONE_R + 4.0F) * scale;
-		drawSolidCircle(mat, cx, cy, hubR + 2.0F, CrimsonTheme.withAlpha(CrimsonTheme.BORDER_OUTER, 180));
-		drawSolidCircle(mat, cx, cy, hubR, CrimsonTheme.withAlpha(CrimsonTheme.BG_WINDOW, 242));
+		drawSolidCircle(mat, cx, cy, hubR + 0.85F, CrimsonTheme.withAlpha(CrimsonTheme.BORDER_OUTER, 140));
+		drawSolidCircle(mat, cx, cy, hubR, CrimsonTheme.withAlpha(CrimsonTheme.BG_WINDOW, 138));
 
 		// Directional pointer dot toward mouse if outside deadzone
 		if (this.hoveredSector >= 0) {
@@ -288,11 +282,14 @@ public class RadialWheelScreen extends Screen {
 			ctx.drawTextWithShadow(this.textRenderer, shortTitle, -this.textRenderer.getWidth(shortTitle) / 2, 0, CrimsonTheme.TEXT_PRIMARY);
 			ctx.getMatrices().pop();
 
-			// Sleek rounded info pill below the wheel
+			// Sleek translucent rounded info pill below the wheel
 			int cardW = Math.max(176, this.textRenderer.getWidth(sel.hint()) + 24);
 			int cardX = Math.round(cx - cardW * 0.5F);
 			int cardY = Math.min(this.height - 34, Math.round(cy + (OUTER_R + 18.0F) * scale));
-			CrimsonTheme.drawCard(ctx, cardX, cardY, cardW, 26, true, sel.activeState() ? sel.stateColor() : CrimsonTheme.CRIMSON_BRIGHT);
+			int pillAccent = sel.activeState() ? sel.stateColor() : CrimsonTheme.CRIMSON_BRIGHT;
+			CrimsonTheme.drawRoundedRect(ctx, cardX, cardY, cardW, 26, 5.0F, CrimsonTheme.withAlpha(CrimsonTheme.BG_WINDOW, 135));
+			CrimsonTheme.drawRoundedOutline(ctx, cardX, cardY, cardW, 26, 5.0F, 0.55F, CrimsonTheme.withAlpha(pillAccent, 165));
+			CrimsonTheme.drawRoundedRect(ctx, cardX + 2.0F, cardY + 5.0F, 1.2F, 16.0F, 0.6F, CrimsonTheme.withAlpha(pillAccent, 215));
 			drawCentered(ctx, sel.title() + "  ·  " + sel.status(), (int) cx, cardY + 4, CrimsonTheme.TEXT_PRIMARY);
 			drawCentered(ctx, sel.hint(), (int) cx, cardY + 14, CrimsonTheme.TEXT_SECONDARY);
 		} else {

@@ -97,7 +97,7 @@ public class ClientStateSnapshot {
 	public int selectedWaypointColor = 0xFFDC1E36;
 
 	// Item Upgrader UI & Arcane Altar Ritual state
-	public static final long RITUAL_DURATION_MS = 4000L;
+	public static final long RITUAL_DURATION_MS = 3400L;
 	public int upgraderSelectedSlot = 0;
 	public int upgraderAmount = 1;
 	public String upgraderTargetId = "minecraft:netherite_ingot";
