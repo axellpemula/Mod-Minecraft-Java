@@ -1,6 +1,6 @@
 # Void Sovereign — Fabric 1.21.1 Edition
 
-Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema)**, **Quick Radial Wheel (`R`)**, **Arcane Altar Item Upgrader + Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
+Mod **Void Sovereign v1.7.5** (*oleh xVoid Axell*) untuk **Minecraft Java Edition `1.21.1` (Fabric)** dengan **Modern Frosted Dashboard GUI (5 Tema)**, **Live Weapon Damage Studio (All-Weapons Catalog + Bag Forge)**, **Quick Radial Wheel (`R`)**, **Arcane Altar Item Upgrader + Pity**, dan **Return by Death (`20s` True Chrono World Rewind)**.
 
 ## Persyaratan
 - **Minecraft Java Edition**: `1.21.1`
@@ -29,3 +29,4 @@ File `.jar` siap pakai akan dihasilkan di:
 - Tekan tombol **`R`** sekali (tanpa ditahan) untuk membuka **Quick Radial Wheel**,
 - Tekan tombol **`G`** untuk toggle **Fullbright**, **atau**
 - Ketik command **`/vs`**, **`/vs config`**, **`/hc`**, atau **`/hc:config`** *(langsung jalan di dunia **Hardcore** maupun **Survival** tanpa perlu menyalakan Cheat / Open to LAN!)*.
+- Shortcut cepat kustomisasi damage senjata di tangan: **`/vs damage <angka> [speed]`** atau **`/vs damage reset`**.

@@ -9,6 +9,7 @@
 		"LevelInfoAccessor",
 		"LevelPropertiesAccessor",
 		"ServerPlayerInteractionManagerMixin",
+		"WeaponDamageMixin",
 		"WorldMixin"
 	],
 	"injectors": {

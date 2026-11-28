@@ -241,6 +241,88 @@ public final class ActionDispatcher {
 			}
 
 			// 5. Enchantments (Vanilla & Over-Enchant Lv. 25 — Armor, Offhand, Hotbar & Bag!)
+			case "toggle_weapon_studio" -> {
+				worldData.weaponStudioEnabled = !worldData.weaponStudioEnabled;
+				HardcoreStateManager.save(server);
+				WeaponDamageFeature.syncAllOnlineInventories(server);
+				toast = "⚔ Live Weapon Damage: " + (worldData.weaponStudioEnabled ? "ENABLED" : "PAUSED (Vanilla)");
+			}
+			case "set_global_weapon_mult" -> {
+				double mult = Math.max(0.0, Math.min(10000.0, Math.round(getDouble(obj, "value", 1.0) * 100.0) / 100.0));
+				worldData.globalWeaponMultiplier = mult;
+				HardcoreStateManager.save(server);
+				toast = String.format(Locale.US, "⚔ Global Weapon Multiplier: %.2fx", mult);
+			}
+			case "select_weapon_slot" -> {
+				profile.selectedWeaponSlot = getInt(obj, "slot", -1);
+				toast = "";
+			}
+			case "apply_bag_weapon" -> {
+				int slot = getInt(obj, "slot", profile.selectedWeaponSlot);
+				double dmg = WeaponDamageFeature.clampDamage(getDouble(obj, "damage", 7.0));
+				double spd = WeaponDamageFeature.clampSpeed(getDouble(obj, "speed", 1.6));
+				ItemStack target = EnchantFeature.getStackAtSlot(player, slot);
+				if (target.isEmpty()) {
+					toast = "No item found in selected slot!";
+					ok = false;
+				} else {
+					String itemName = target.getName().getString();
+					WeaponDamageFeature.applyCustomStatsToSlot(player, slot, dmg, spd);
+					toast = String.format(Locale.US, "⚔ Forged %s → %s DMG · %s SPD",
+							itemName, formatStat(dmg), formatStat(spd));
+				}
+			}
+			case "reset_bag_weapon" -> {
+				int slot = getInt(obj, "slot", profile.selectedWeaponSlot);
+				ItemStack target = EnchantFeature.getStackAtSlot(player, slot);
+				if (target.isEmpty()) {
+					toast = "No item found in selected slot!";
+					ok = false;
+				} else {
+					String itemName = target.getName().getString();
+					WeaponDamageFeature.resetSlotWeaponToDefault(player, slot);
+					toast = "↺ Reset " + itemName + " to default stats";
+				}
+			}
+			case "set_catalog_weapon" -> {
+				String itemId = getStr(obj, "id", "");
+				Identifier parsed = Identifier.tryParse(itemId);
+				if (parsed == null || !Registries.ITEM.containsId(parsed)) {
+					toast = "Unknown weapon ID: " + itemId;
+					ok = false;
+				} else {
+					Double dmg = (obj.has("damage") && !obj.get("damage").isJsonNull())
+							? WeaponDamageFeature.clampDamage(getDouble(obj, "damage", 7.0))
+							: null;
+					Double spd = (obj.has("speed") && !obj.get("speed").isJsonNull())
+							? WeaponDamageFeature.clampSpeed(getDouble(obj, "speed", 1.6))
+							: null;
+					WeaponDamageFeature.setCatalogWeaponOverride(server, parsed.toString(), dmg, spd);
+					String itemName = Registries.ITEM.get(parsed).getName().getString();
+					toast = dmg != null
+							? ("⚔ Live " + itemName + " Damage → " + formatStat(dmg))
+							: ("⚔ Updated " + itemName);
+				}
+			}
+			case "reset_catalog_weapon" -> {
+				String itemId = getStr(obj, "id", "");
+				Identifier parsed = Identifier.tryParse(itemId);
+				if (parsed != null && Registries.ITEM.containsId(parsed)) {
+					WeaponDamageFeature.resetCatalogWeaponOverride(server, parsed.toString());
+					String itemName = Registries.ITEM.get(parsed).getName().getString();
+					toast = "↺ Reset " + itemName + " to Vanilla Damage";
+				} else {
+					WeaponDamageFeature.resetCatalogWeaponOverride(server, itemId);
+					toast = "↺ Reset weapon to Vanilla Damage";
+				}
+			}
+			case "reset_all_catalog_weapons" -> {
+				WeaponDamageFeature.resetAllCatalogOverrides(server);
+				player.getWorld().playSound(null, player.getBlockPos(),
+						SoundEvents.BLOCK_GRINDSTONE_USE, SoundCategory.PLAYERS, 0.85F, 1.0F);
+				toast = "↺ All Weapon Overrides & Multiplier Reset to Vanilla";
+			}
+
 			case "select_enchant_slot" -> {
 				profile.selectedEnchantSlot = getInt(obj, "slot", -1);
 				toast = "";
@@ -770,5 +852,12 @@ public final class ActionDispatcher {
 		} catch (Exception e) {
 			return def;
 		}
+	}
+
+	private static String formatStat(double val) {
+		if (Math.abs(val - Math.rint(val)) < 1e-4) {
+			return Long.toString(Math.round(val));
+		}
+		return String.format(Locale.US, "%.2f", val).replaceAll("0+$", "").replaceAll("\\.$", "");
 	}
 }

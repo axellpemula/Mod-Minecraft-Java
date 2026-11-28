@@ -38,6 +38,7 @@ public class PlayerProfile {
 	public double upgraderPity = 0.0;
 	public int upgraderFailStreak = 0;
 	public transient int selectedEnchantSlot = -1;
+	public transient int selectedWeaponSlot = -1;
 	public transient long lastUpgradeRollSeq = 0L;
 	public transient ItemUpgraderFeature.RollOutcome pendingRollOutcome = null;
 

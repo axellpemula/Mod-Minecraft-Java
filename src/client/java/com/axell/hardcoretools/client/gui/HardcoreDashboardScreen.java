@@ -67,6 +67,7 @@ public class HardcoreDashboardScreen extends Screen {
 			new TabDef("hc.java.tab.vein", "Vein & Tree", icon("veinminer")),
 			new TabDef("hc.java.tab.sneak", "Sneak Grow", icon("sneakgrow")),
 			new TabDef("hc.java.tab.ore", "Ore Plus+", icon("oreplus")),
+			new TabDef("hc.java.tab.weapons", "Weapons", icon("weapons")),
 			new TabDef("hc.java.tab.enchant", "Enchants", icon("enchant")),
 			new TabDef("hc.java.tab.books", "Ench. Books", icon("book")),
 			new TabDef("hc.java.tab.repair", "Repair", icon("repair")),
@@ -102,6 +103,9 @@ public class HardcoreDashboardScreen extends Screen {
 			new InfoEntry(icon("oreplus"), "Ore Plus+", "World & Ore", 0xFFFF8C38,
 					"Menggandakan hasil tambang bijih mentah (x2 hingga x4) dan dapat diatur aktif/nonaktif untuk masing-masing jenis bijih.",
 					"Multiplies raw ore drops (x2 to x4) with individual per-ore filters so you control exactly which ores get boosted."),
+			new InfoEntry(icon("weapons"), "Weapon Damage Studio", "Gear & Magic", 0xFFFF4264,
+					"Kustomisasi damage seluruh senjata secara live (Sword, Axe, Mace, Trident, Bow, Crossbow, alat, hingga senjata mod) + tempa Attack Damage & Attack Speed kustom pada item spesifik di tas lengkap dengan update tooltip hijau asli.",
+					"Customize live damage across all weapons (Swords, Axes, Mace, Trident, Bow, Crossbow, tools, and modded weapons) plus forge custom Attack Damage & Attack Speed onto specific bag items with native green tooltip updates."),
 			new InfoEntry(icon("enchant"), "Enchants & God Stack (Lv. 25)", "Gear & Magic", 0xFFC86BFF,
 					"Pasang enchantment langsung ke senjata, alat, atau armor di tas hingga Over-Enchant Level XXV (25), 1-Click Auto Max All Gear, serta God Stack untuk menggabungkan enchant yang normalnya saling bentrok.",
 					"Apply enchantments directly to any gear in your bag up to Over-Enchant Level XXV (25), 1-Click Auto Max All Gear, and God Stack to combine mutually exclusive enchantments."),
@@ -296,7 +300,34 @@ public class HardcoreDashboardScreen extends Screen {
 		this.primaryInput.setWidth(inputW);
 
 		switch (tab) {
-			case 4, 5, 14 -> {
+			case 4 -> {
+				ClientStateSnapshot s = ClientStateSnapshot.INSTANCE;
+				this.primaryInput.setVisible(true);
+				if (s.weaponStudioSubMode == 1) {
+					this.primaryInput.setChangedListener(val -> {
+						if (val != null && !val.trim().isEmpty()) {
+							try {
+								double parsed = Double.parseDouble(val.trim());
+								if (!Double.isNaN(parsed) && !Double.isInfinite(parsed) && parsed >= 0.0) {
+									s.pendingBagDamage = Math.min(1_000_000.0, Math.round(parsed * 100.0) / 100.0);
+								}
+							} catch (NumberFormatException ignored) {
+							}
+						}
+					});
+					this.primaryInput.setPlaceholder(Text.literal("Exact Damage (e.g. 25, 250, 9999)...").formatted(Formatting.DARK_GRAY));
+					this.primaryInput.setText(formatWeaponStat(s.pendingBagDamage));
+				} else {
+					this.primaryInput.setPlaceholder(Text.literal("Search sword, axe, mace, bow, trident...").formatted(Formatting.DARK_GRAY));
+					this.primaryInput.setText(this.searchQuery);
+					this.primaryInput.setChangedListener(val -> {
+						this.searchQuery = val;
+						this.contentScroll = 0;
+						this.targetContentScroll = 0;
+					});
+				}
+			}
+			case 5, 6, 15 -> {
 				this.primaryInput.setVisible(true);
 				this.primaryInput.setPlaceholder(Text.translatable("hc.java.search").formatted(Formatting.DARK_GRAY));
 				this.primaryInput.setText(this.searchQuery);
@@ -306,7 +337,7 @@ public class HardcoreDashboardScreen extends Screen {
 					this.targetContentScroll = 0;
 				});
 			}
-			case 7 -> {
+			case 8 -> {
 				this.primaryInput.setVisible(true);
 				this.primaryInput.setPlaceholder(Text.literal("Search any target item...").formatted(Formatting.DARK_GRAY));
 				this.primaryInput.setText(this.searchQuery);
@@ -314,14 +345,14 @@ public class HardcoreDashboardScreen extends Screen {
 					this.searchQuery = val;
 				});
 			}
-			case 10 -> {
+			case 11 -> {
 				this.primaryInput.setVisible(true);
 				this.primaryInput.setChangedListener(val -> {
 				});
 				this.primaryInput.setPlaceholder(Text.literal("Enter target XP Level...").formatted(Formatting.DARK_GRAY));
 				this.primaryInput.setText(String.valueOf(ClientStateSnapshot.INSTANCE.xpLevel));
 			}
-			case 11 -> {
+			case 12 -> {
 				if (ClientStateSnapshot.INSTANCE.teleportSubTab == 3) {
 					this.primaryInput.setVisible(true);
 					this.primaryInput.setChangedListener(val -> {
@@ -340,14 +371,14 @@ public class HardcoreDashboardScreen extends Screen {
 					});
 				}
 			}
-			case 12 -> {
+			case 13 -> {
 				this.primaryInput.setVisible(true);
 				this.primaryInput.setChangedListener(val -> {
 				});
 				this.primaryInput.setPlaceholder(Text.literal("New Waypoint Name (e.g. Base)...").formatted(Formatting.DARK_GRAY));
 				this.primaryInput.setText("");
 			}
-			case 13 -> {
+			case 14 -> {
 				this.primaryInput.setVisible(true);
 				this.primaryInput.setChangedListener(val -> {
 				});
@@ -628,7 +659,7 @@ public class HardcoreDashboardScreen extends Screen {
 			CrimsonTheme.drawRoundedRect(ctx, ibX, ibY, ibW, ibH, 5.0F, CrimsonTheme.BG_INPUT);
 			CrimsonTheme.drawRoundedOutline(ctx, ibX, ibY, ibW, ibH, 5.0F, 1.0F,
 					focused ? CrimsonTheme.CRIMSON_BRIGHT : CrimsonTheme.BORDER_SUBTLE);
-			String glyph = (s.activeTab == 13) ? ">_" : "⌕";
+			String glyph = (s.activeTab == 14) ? ">_" : ((s.activeTab == 4 && s.weaponStudioSubMode == 1) ? "⚔" : "⌕");
 			ctx.drawTextWithShadow(this.textRenderer, glyph, ibX + 6, ibY + 5,
 					focused ? CrimsonTheme.CRIMSON_BRIGHT : CrimsonTheme.TEXT_MUTED);
 			this.primaryInput.render(ctx, mouseX, mouseY, delta);
@@ -699,8 +730,8 @@ public class HardcoreDashboardScreen extends Screen {
 			case 0 -> "SURVIVAL";
 			case 1 -> "WORLD";
 			case 4 -> "GEAR & MAGIC";
-			case 11 -> "NAVIGATION";
-			case 14 -> "INFO";
+			case 12 -> "NAVIGATION";
+			case 15 -> "INFO";
 			default -> null;
 		};
 	}
@@ -808,17 +839,18 @@ public class HardcoreDashboardScreen extends Screen {
 			case 1 -> renderVeinTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 			case 2 -> renderSneakTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 			case 3 -> renderOrePlusTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 4 -> renderEnchantTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 5 -> renderBooksTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 6 -> renderRepairTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 7 -> renderUpgraderTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 8 -> renderUncraftTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 9 -> renderEffectsTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 10 -> renderXpTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 11 -> renderTeleportTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 12 -> renderWaypointsTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 13 -> renderConsoleTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
-			case 14 -> renderInfoTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 4 -> renderWeaponDamageTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 5 -> renderEnchantTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 6 -> renderBooksTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 7 -> renderRepairTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 8 -> renderUpgraderTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 9 -> renderUncraftTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 10 -> renderEffectsTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 11 -> renderXpTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 12 -> renderTeleportTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 13 -> renderWaypointsTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 14 -> renderConsoleTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+			case 15 -> renderInfoTab(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 			default -> y;
 		};
 	}
@@ -968,7 +1000,442 @@ public class HardcoreDashboardScreen extends Screen {
 		return y;
 	}
 
-	// ==================== TAB 4: ENCHANTMENTS (NATIVE LV. 25) ====================
+	// ==================== TAB 4: LIVE WEAPON DAMAGE STUDIO ====================
+	private int renderWeaponDamageTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
+		// Top Mode Switcher: [ ⚔ All-Weapons Live Catalog ] | [ 🎒 Bag & Hand Item Forge ]
+		int halfW = (w - 6) / 2;
+		boolean catActive = (s.weaponStudioSubMode == 0);
+		boolean bagActive = (s.weaponStudioSubMode == 1);
+		boolean hovCat = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, halfW, 19);
+		boolean hovBag = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x + halfW + 6, y, w - halfW - 6, 19);
+
+		CrimsonTheme.drawSubtleButton(ctx, textRenderer, x, y, halfW, 19,
+				trimToWidth("⚔ All-Weapons Catalog", halfW - 8), catActive, hovCat);
+		CrimsonTheme.drawSubtleButton(ctx, textRenderer, x + halfW + 6, y, w - halfW - 6, 19,
+				trimToWidth("🎒 Bag & Hand Forge", w - halfW - 14), bagActive, hovBag);
+
+		addClippedClick(x, y, halfW, 19, clipTop, clipBot, () -> {
+			if (s.weaponStudioSubMode != 0) {
+				s.weaponStudioSubMode = 0;
+				this.contentScroll = 0;
+				this.targetContentScroll = 0;
+				configureInputForActiveTab();
+			}
+		});
+		addClippedClick(x + halfW + 6, y, w - halfW - 6, 19, clipTop, clipBot, () -> {
+			if (s.weaponStudioSubMode != 1) {
+				s.weaponStudioSubMode = 1;
+				this.contentScroll = 0;
+				this.targetContentScroll = 0;
+				configureInputForActiveTab();
+			}
+		});
+		y += 23;
+
+		if (s.weaponStudioSubMode == 1) {
+			return renderBagWeaponForgeSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+		}
+		return renderWeaponCatalogSubMode(ctx, s, x, y, w, clipTop, clipBot, mx, my);
+	}
+
+	private int renderWeaponCatalogSubMode(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
+		int activeOverrides = 0;
+		for (ClientStateSnapshot.WeaponCatalogItem wc : s.weaponCatalog) {
+			if (wc.overridden) activeOverrides++;
+		}
+
+		// 1. Master Live Toggle
+		y = drawToggleCard(ctx, x, y, w,
+				"Live Weapon Damage Overrides (" + activeOverrides + " Active)",
+				s.weaponStudioEnabled, clipTop, clipBot, mx, my,
+				() -> sendAction("toggle_weapon_studio", new JsonObject()));
+
+		// 2. Global Weapon Multiplier Strip
+		boolean multChanged = Math.abs(s.globalWeaponMultiplier - 1.0) > 1e-4;
+		CrimsonTheme.drawCard(ctx, x, y, w, 34, false, multChanged ? CrimsonTheme.GOLD : CrimsonTheme.BORDER_SUBTLE);
+		ctx.drawTextWithShadow(textRenderer, "Global Weapon Multiplier", x + 8, y + 5, CrimsonTheme.TEXT_PRIMARY);
+		String multBadge = String.format(Locale.US, "%.2fx", s.globalWeaponMultiplier).replaceAll("0+x$", "x").replaceAll("\\.x$", ".0x");
+		int mbW = textRenderer.getWidth(multBadge) + 10;
+		CrimsonTheme.drawBadge(ctx, textRenderer, x + w - mbW - 6, y + 4, multBadge,
+				CrimsonTheme.withAlpha(multChanged ? CrimsonTheme.GOLD : CrimsonTheme.CRIMSON, 48),
+				multChanged ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_SECONDARY,
+				multChanged ? CrimsonTheme.GOLD : CrimsonTheme.TEXT_PRIMARY);
+
+		double[] multPresets = { 0.5, 1.0, 1.5, 2.0, 5.0, 10.0 };
+		int mpGap = 3;
+		int resetBtnW = 52;
+		int availMultW = w - 16 - resetBtnW - mpGap;
+		int mpW = Math.max(24, (availMultW - mpGap * (multPresets.length - 1)) / multPresets.length);
+		int mpX = x + 8;
+		for (double mp : multPresets) {
+			boolean sel = Math.abs(s.globalWeaponMultiplier - mp) < 1e-3;
+			String lbl = (mp == Math.rint(mp)) ? ((int) mp + "x") : (mp + "x");
+			boolean mHov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, mpX, y + 17, mpW, 14);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, mpX, y + 17, mpW, 14, lbl, sel, mHov);
+			final double targetMult = mp;
+			addClippedClick(mpX, y + 17, mpW, 14, clipTop, clipBot, () -> {
+				s.globalWeaponMultiplier = targetMult;
+				JsonObject o = new JsonObject();
+				o.addProperty("value", targetMult);
+				sendAction("set_global_weapon_mult", o);
+			});
+			mpX += mpW + mpGap;
+		}
+		drawActionBtn(ctx, x + w - resetBtnW - 6, y + 17, resetBtnW, 14, "Reset All", 0xFF5A1D28, clipTop, clipBot, mx, my, () -> {
+			s.globalWeaponMultiplier = 1.0;
+			sendAction("reset_all_catalog_weapons", new JsonObject());
+		});
+		y += 38;
+
+		// 3. Target Live Damage Slider + 1-Click Power Presets
+		int sliderVal = Math.max(1, Math.min(500, (int) Math.round(s.pendingCatalogDamage)));
+		y = drawSliderCard(ctx, "cat_wpn_dmg", x, y, w, "Target Live Damage",
+				formatWeaponStat(s.pendingCatalogDamage) + " DMG",
+				sliderVal, 1, 500, clipTop, clipBot, mx, my,
+				v -> s.pendingCatalogDamage = v,
+				v -> s.pendingCatalogDamage = v);
+
+		int[] dmgPresets = { 10, 25, 50, 100, 250, 500, 1000, 9999 };
+		int dpGap = 3;
+		int dpCount = dmgPresets.length + 1; // + "×2"
+		int dpW = Math.max(22, (w - dpGap * (dpCount - 1)) / dpCount);
+		int dpX = x;
+		for (int dp : dmgPresets) {
+			boolean sel = Math.abs(s.pendingCatalogDamage - dp) < 1e-3;
+			String lbl = dp >= 1000 ? (dp == 1000 ? "1K" : "9999") : Integer.toString(dp);
+			boolean dHov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, dpX, y, dpW, 15);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, dpX, y, dpW, 15, lbl, sel, dHov);
+			final double chosen = dp;
+			addClippedClick(dpX, y, dpW, 15, clipTop, clipBot, () -> s.pendingCatalogDamage = chosen);
+			dpX += dpW + dpGap;
+		}
+		int lastW = Math.max(22, (x + w) - dpX);
+		boolean x2Hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, dpX, y, lastW, 15);
+		CrimsonTheme.drawSubtleButton(ctx, textRenderer, dpX, y, lastW, 15, "×2", false, x2Hov);
+		addClippedClick(dpX, y, lastW, 15, clipTop, clipBot, () ->
+				s.pendingCatalogDamage = Math.min(1_000_000.0, Math.max(1.0, Math.round(s.pendingCatalogDamage * 2.0 * 100.0) / 100.0)));
+		y += 19;
+
+		// 4. Category Filter Pills: All | Swords | Axes & Mace | Ranged | Tools
+		String[] catLabels = { "All", "Swords", "Axes & Mace", "Ranged", "Tools" };
+		int cGap = 3;
+		int cW = (w - cGap * (catLabels.length - 1)) / catLabels.length;
+		for (int ci = 0; ci < catLabels.length; ci++) {
+			int cx = x + ci * (cW + cGap);
+			int btnW = (ci == catLabels.length - 1) ? (x + w - cx) : cW;
+			boolean cAct = (s.weaponCategoryFilter == ci);
+			boolean cHov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, cx, y, btnW, 16);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, cx, y, btnW, 16,
+					trimToWidth(catLabels[ci], btnW - 6), cAct, cHov);
+			final int chosenCat = ci;
+			addClippedClick(cx, y, btnW, 16, clipTop, clipBot, () -> {
+				s.weaponCategoryFilter = chosenCat;
+				this.contentScroll = 0;
+				this.targetContentScroll = 0;
+			});
+		}
+		y += 20;
+
+		// 5. Filtered Live All-Weapons Catalog Rows
+		String q = this.searchQuery == null ? "" : this.searchQuery.trim().toLowerCase(Locale.ROOT);
+		String reqCat = switch (s.weaponCategoryFilter) {
+			case 1 -> "sword";
+			case 2 -> "axe_mace";
+			case 3 -> "ranged";
+			case 4 -> "tool";
+			default -> "";
+		};
+
+		int shown = 0;
+		for (ClientStateSnapshot.WeaponCatalogItem item : s.weaponCatalog) {
+			if (!reqCat.isEmpty() && !reqCat.equals(item.category)) continue;
+			if (!q.isEmpty() && !item.name.toLowerCase(Locale.ROOT).contains(q) && !item.id.toLowerCase(Locale.ROOT).contains(q)) {
+				continue;
+			}
+			shown++;
+
+			int rowH = 26;
+			boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, w, rowH);
+			int accent = item.overridden ? (s.weaponStudioEnabled ? CrimsonTheme.EMERALD : CrimsonTheme.GOLD) : 0;
+			CrimsonTheme.drawCard(ctx, x, y, w, rowH, hov, accent);
+
+			// 3D Weapon Icon
+			drawModernSlotBox(ctx, x + 4, y + 3, 20, 20, item.overridden, hov, CrimsonTheme.GOLD);
+			Identifier ident = Identifier.tryParse(item.id);
+			if (ident != null && Registries.ITEM.containsId(ident)) {
+				ItemStack preview = new ItemStack(Registries.ITEM.get(ident));
+				ctx.drawItem(preview, x + 6, y + 5);
+				if (hov && inRect(mx, my, x + 4, y + 3, 20, 20)) {
+					this.hoveredTooltipStack = preview;
+				}
+			}
+
+			// Right-side Controls: [↺] (if overridden) | [-] | [+] | [Set <val>]
+			int rightX = x + w - 4;
+			String setLabel = "Set " + formatWeaponStat(s.pendingCatalogDamage);
+			int setBtnW = Math.max(44, textRenderer.getWidth(setLabel) + 10);
+			rightX -= setBtnW;
+			drawActionBtn(ctx, rightX, y + 5, setBtnW, 16, setLabel, CrimsonTheme.CRIMSON, clipTop, clipBot, mx, my, () -> {
+				JsonObject o = new JsonObject();
+				o.addProperty("id", item.id);
+				o.addProperty("damage", s.pendingCatalogDamage);
+				sendAction("set_catalog_weapon", o);
+			});
+
+			rightX -= 18;
+			drawActionBtn(ctx, rightX, y + 5, 15, 16, "+", 0xFF245B42, clipTop, clipBot, mx, my, () -> {
+				JsonObject o = new JsonObject();
+				o.addProperty("id", item.id);
+				o.addProperty("damage", Math.min(1_000_000.0, item.activeDamage + 1.0));
+				sendAction("set_catalog_weapon", o);
+			});
+
+			rightX -= 17;
+			drawActionBtn(ctx, rightX, y + 5, 15, 16, "-", 0xFF2D3A4B, clipTop, clipBot, mx, my, () -> {
+				JsonObject o = new JsonObject();
+				o.addProperty("id", item.id);
+				o.addProperty("damage", Math.max(0.0, item.activeDamage - 1.0));
+				sendAction("set_catalog_weapon", o);
+			});
+
+			if (item.overridden) {
+				rightX -= 19;
+				drawActionBtn(ctx, rightX, y + 5, 16, 16, "↺", 0xFF5A1D28, clipTop, clipBot, mx, my, () -> {
+					JsonObject o = new JsonObject();
+					o.addProperty("id", item.id);
+					sendAction("reset_catalog_weapon", o);
+				});
+			}
+
+			int availTextW = Math.max(40, rightX - (x + 29) - 4);
+			ctx.drawTextWithShadow(textRenderer, trimToWidth(item.name, availTextW), x + 28, y + 4, CrimsonTheme.TEXT_PRIMARY);
+
+			String statLine = item.overridden
+					? ("Vanilla " + formatWeaponStat(item.vanillaDamage) + " → LIVE " + formatWeaponStat(item.activeDamage) + " DMG")
+					: ("ranged".equals(item.category) && !item.id.endsWith("trident")
+							? ("Vanilla Shot: " + formatWeaponStat(item.vanillaDamage) + " DMG")
+							: ("Vanilla: " + formatWeaponStat(item.vanillaDamage) + " DMG · " + formatWeaponStat(item.vanillaSpeed) + " SPD"));
+			int subCol = item.overridden
+					? (s.weaponStudioEnabled ? CrimsonTheme.EMERALD : CrimsonTheme.GOLD)
+					: CrimsonTheme.TEXT_MUTED;
+			ctx.drawTextWithShadow(textRenderer, trimToWidth(statLine, availTextW), x + 28, y + 15, subCol);
+
+			y += rowH + 3;
+		}
+
+		if (shown == 0) {
+			CrimsonTheme.drawCard(ctx, x, y, w, 24, false, 0);
+			ctx.drawTextWithShadow(textRenderer, "No matching weapons found.", x + 10, y + 8, CrimsonTheme.TEXT_MUTED);
+			y += 28;
+		}
+		return y;
+	}
+
+	private int renderBagWeaponForgeSubMode(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
+		ClientStateSnapshot.BagWeaponItem selected = null;
+		for (ClientStateSnapshot.BagWeaponItem bw : s.bagWeapons) {
+			if (bw.slot == s.selectedWeaponSlot) {
+				selected = bw;
+				break;
+			}
+		}
+		if (selected == null && !s.bagWeapons.isEmpty()) {
+			selected = s.bagWeapons.get(0);
+			s.selectedWeaponSlot = selected.slot;
+		}
+
+		// 1. Selected Bag Weapon Showcase Card
+		ItemStack targetStack = selected != null ? getClientStackAtSlot(selected.slot) : ItemStack.EMPTY;
+		int showH = 34;
+		boolean showHov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, x, y, w, showH);
+		int showAccent = selected == null ? CrimsonTheme.BORDER_SUBTLE
+				: (selected.customItem ? CrimsonTheme.AMETHYST : (selected.catalogOverridden ? CrimsonTheme.EMERALD : CrimsonTheme.GOLD));
+		CrimsonTheme.drawCard(ctx, x, y, w, showH, showHov, showAccent);
+		drawModernSlotBox(ctx, x + 6, y + 7, 20, 20, !targetStack.isEmpty(), showHov, CrimsonTheme.GOLD);
+
+		if (selected != null && !targetStack.isEmpty()) {
+			ctx.drawItem(targetStack, x + 8, y + 9);
+			ctx.drawItemInSlot(this.textRenderer, targetStack, x + 8, y + 9);
+			if (showHov && inRect(mx, my, x + 6, y + 7, 20, 20)) {
+				this.hoveredTooltipStack = targetStack;
+			}
+
+			String badgeTxt = selected.customItem ? "CUSTOM FORGED" : (selected.catalogOverridden ? "CATALOG LIVE" : s.selectedWeaponSlotLabel);
+			int badgeCol = selected.customItem ? CrimsonTheme.AMETHYST : (selected.catalogOverridden ? CrimsonTheme.EMERALD : CrimsonTheme.CRIMSON_BRIGHT);
+			int bw = textRenderer.getWidth(badgeTxt) + 10;
+			CrimsonTheme.drawBadge(ctx, textRenderer, x + w - bw - 6, y + 5, badgeTxt,
+					CrimsonTheme.withAlpha(badgeCol, 48), badgeCol, badgeCol);
+
+			ctx.drawTextWithShadow(textRenderer, trimToWidth(selected.name, w - bw - 44), x + 32, y + 6, CrimsonTheme.GOLD);
+			String statsSub = "Vanilla " + formatWeaponStat(selected.vanillaDamage) + " DMG · " + formatWeaponStat(selected.vanillaSpeed) + " SPD"
+					+ "  →  Active: " + formatWeaponStat(selected.currentDamage) + " DMG · " + formatWeaponStat(selected.currentSpeed) + " SPD";
+			ctx.drawTextWithShadow(textRenderer, trimToWidth(statsSub, w - 40), x + 32, y + 19,
+					selected.customItem ? CrimsonTheme.AMETHYST : CrimsonTheme.TEXT_SECONDARY);
+		} else {
+			ctx.drawTextWithShadow(textRenderer, "Hold or carry any weapon/item in your Hotbar or Bag", x + 32, y + 13, CrimsonTheme.TEXT_MUTED);
+		}
+		y += showH + 5;
+
+		// 2. Interactive 3D Bag & Hand Weapon Picker Strip
+		if (!s.bagWeapons.isEmpty()) {
+			CrimsonTheme.drawSectionHeader(ctx, textRenderer, x, y, w, "SELECT ITEM IN BAG / HAND — " + s.bagWeapons.size());
+			y += 15;
+
+			int cellW = 24;
+			int cellH = 24;
+			int gap = 3;
+			int cols = Math.max(1, (w + gap) / (cellW + gap));
+			int col = 0;
+			int rowY = y;
+
+			for (ClientStateSnapshot.BagWeaponItem bw : s.bagWeapons) {
+				int cx = x + col * (cellW + gap);
+				boolean isSel = (bw.slot == s.selectedWeaponSlot);
+				boolean hov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, cx, rowY, cellW, cellH);
+
+				drawModernSlotBox(ctx, cx, rowY, cellW, cellH, isSel, hov, CrimsonTheme.GOLD);
+				ItemStack slotStack = getClientStackAtSlot(bw.slot);
+				if (!slotStack.isEmpty()) {
+					ctx.drawItem(slotStack, cx + 4, rowY + 4);
+					ctx.drawItemInSlot(this.textRenderer, slotStack, cx + 4, rowY + 4);
+					if (hov) {
+						this.hoveredTooltipStack = slotStack;
+					}
+				}
+				if (bw.customItem) {
+					CrimsonTheme.drawCircle(ctx, cx + cellW - 4.0F, rowY + 4.0F, 1.9F, CrimsonTheme.AMETHYST);
+				} else if (bw.catalogOverridden) {
+					CrimsonTheme.drawCircle(ctx, cx + cellW - 4.0F, rowY + 4.0F, 1.8F, CrimsonTheme.EMERALD);
+				}
+
+				final ClientStateSnapshot.BagWeaponItem clickedItem = bw;
+				addClippedClick(cx, rowY, cellW, cellH, clipTop, clipBot, () -> {
+					s.selectedWeaponSlot = clickedItem.slot;
+					s.pendingBagDamage = clickedItem.currentDamage;
+					s.pendingBagSpeed = clickedItem.currentSpeed;
+					s.lastLoadedBagWeaponSlot = clickedItem.slot;
+					if (this.primaryInput != null && s.activeTab == 4 && s.weaponStudioSubMode == 1) {
+						this.primaryInput.setText(formatWeaponStat(s.pendingBagDamage));
+					}
+					JsonObject o = new JsonObject();
+					o.addProperty("slot", clickedItem.slot);
+					sendAction("select_weapon_slot", o);
+				});
+
+				col++;
+				if (col >= cols) {
+					col = 0;
+					rowY += cellH + gap;
+				}
+			}
+			y = (col == 0 ? rowY : rowY + cellH + gap) + 4;
+		}
+
+		// 3. Custom Attack Damage Slider + 1-Click Presets (synced with top Exact Damage input!)
+		int dmgSliderVal = Math.max(1, Math.min(500, (int) Math.round(s.pendingBagDamage)));
+		y = drawSliderCard(ctx, "bag_wpn_dmg", x, y, w, "Custom Attack Damage (or type above)",
+				formatWeaponStat(s.pendingBagDamage) + " DMG",
+				dmgSliderVal, 1, 500, clipTop, clipBot, mx, my,
+				v -> {
+					s.pendingBagDamage = v;
+					if (this.primaryInput != null && !this.primaryInput.isFocused()) {
+						this.primaryInput.setText(formatWeaponStat(v));
+					}
+				},
+				v -> {
+					s.pendingBagDamage = v;
+					if (this.primaryInput != null && !this.primaryInput.isFocused()) {
+						this.primaryInput.setText(formatWeaponStat(v));
+					}
+				});
+
+		int[] bagDmgPresets = { 10, 25, 50, 100, 250, 500, 1000, 9999 };
+		int pGap = 3;
+		int pW = Math.max(24, (w - pGap * (bagDmgPresets.length - 1)) / bagDmgPresets.length);
+		for (int i = 0; i < bagDmgPresets.length; i++) {
+			int px = x + i * (pW + pGap);
+			int bw = (i == bagDmgPresets.length - 1) ? (x + w - px) : pW;
+			int val = bagDmgPresets[i];
+			String lbl = val == 1000 ? "1K" : Integer.toString(val);
+			boolean pSel = Math.abs(s.pendingBagDamage - val) < 1e-3;
+			boolean pHov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, px, y, bw, 15);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, px, y, bw, 15, lbl, pSel, pHov);
+			addClippedClick(px, y, bw, 15, clipTop, clipBot, () -> {
+				s.pendingBagDamage = val;
+				if (this.primaryInput != null) {
+					this.primaryInput.setText(formatWeaponStat(val));
+				}
+			});
+		}
+		y += 19;
+
+		// 4. Custom Attack Speed Slider + Presets
+		int spdTenths = Math.max(4, Math.min(200, (int) Math.round(s.pendingBagSpeed * 10.0)));
+		y = drawSliderCard(ctx, "bag_wpn_spd", x, y, w, "Custom Attack Speed",
+				formatWeaponStat(s.pendingBagSpeed) + " SPD",
+				spdTenths, 4, 200, clipTop, clipBot, mx, my,
+				v -> s.pendingBagSpeed = Math.round(v * 10.0) / 100.0,
+				v -> s.pendingBagSpeed = Math.round(v * 10.0) / 100.0);
+
+		double[] spdValues = { 0.8, 1.6, 2.5, 4.0, 10.0, 20.0 };
+		String[] spdLabels = { "0.8 Slow", "1.6 Sword", "2.5 Fast", "4.0 NoCD", "10 Hyper", "20 Inst" };
+		int sGap = 3;
+		int sW = (w - sGap * (spdValues.length - 1)) / spdValues.length;
+		for (int i = 0; i < spdValues.length; i++) {
+			int sx = x + i * (sW + sGap);
+			int bw = (i == spdValues.length - 1) ? (x + w - sx) : sW;
+			double sv = spdValues[i];
+			boolean sSel = Math.abs(s.pendingBagSpeed - sv) < 1e-2;
+			boolean sHov = inClip(mx, my, clipTop, clipBot) && inRect(mx, my, sx, y, bw, 15);
+			CrimsonTheme.drawSubtleButton(ctx, textRenderer, sx, y, bw, 15,
+					trimToWidth(spdLabels[i], bw - 4), sSel, sHov);
+			addClippedClick(sx, y, bw, 15, clipTop, clipBot, () -> s.pendingBagSpeed = sv);
+		}
+		y += 20;
+
+		// 5. Primary Forge & Reset Actions
+		final ClientStateSnapshot.BagWeaponItem activeTarget = selected;
+		int applyW = (w - 6) * 2 / 3;
+		int resetW = w - applyW - 6;
+		drawActionBtn(ctx, x, y, applyW, 21, "⚔ Forge Stats onto Selected Item", CrimsonTheme.CRIMSON, clipTop, clipBot, mx, my, () -> {
+			if (activeTarget == null) return;
+			JsonObject o = new JsonObject();
+			o.addProperty("slot", activeTarget.slot);
+			o.addProperty("damage", s.pendingBagDamage);
+			o.addProperty("speed", s.pendingBagSpeed);
+			sendAction("apply_bag_weapon", o);
+		});
+		drawActionBtn(ctx, x + applyW + 6, y, resetW, 21, "↺ Reset Item", 0xFF5A1D28, clipTop, clipBot, mx, my, () -> {
+			if (activeTarget == null) return;
+			JsonObject o = new JsonObject();
+			o.addProperty("slot", activeTarget.slot);
+			sendAction("reset_bag_weapon", o);
+		});
+		y += 25;
+
+		if (activeTarget != null && !activeTarget.itemId.isEmpty()) {
+			String globalLbl = trimToWidth("🌐 Also Set Live Damage (" + formatWeaponStat(s.pendingBagDamage) + " DMG) for ALL " + activeTarget.name, w - 12);
+			drawActionBtn(ctx, x, y, w, 18, globalLbl, 0xFF2D5B88, clipTop, clipBot, mx, my, () -> {
+				JsonObject o = new JsonObject();
+				o.addProperty("id", activeTarget.itemId);
+				o.addProperty("damage", s.pendingBagDamage);
+				o.addProperty("speed", s.pendingBagSpeed);
+				sendAction("set_catalog_weapon", o);
+			});
+			y += 22;
+		}
+
+		return y;
+	}
+
+	private static String formatWeaponStat(double val) {
+		if (Math.abs(val - Math.rint(val)) < 1e-4) {
+			return Long.toString(Math.round(val));
+		}
+		return String.format(Locale.US, "%.2f", val).replaceAll("0+$", "").replaceAll("\\.$", "");
+	}
+
+	// ==================== TAB 5: ENCHANTMENTS (NATIVE LV. 25) ====================
 	private int renderEnchantTab(DrawContext ctx, ClientStateSnapshot s, int x, int y, int w, int clipTop, int clipBot, int mx, int my) {
 		y = drawTargetEnchantShowcase(ctx, s, x, y, w, clipTop, clipBot, mx, my);
 
@@ -3310,6 +3777,15 @@ public class HardcoreDashboardScreen extends Screen {
 				this.primaryInput.setFocused(false);
 				return true;
 			}
+			if ((keyCode == 257 || keyCode == 335) && s.activeTab == 4 && s.weaponStudioSubMode == 1 && s.selectedWeaponSlot >= 0) {
+				playClickSound(1.0F);
+				JsonObject o = new JsonObject();
+				o.addProperty("slot", s.selectedWeaponSlot);
+				o.addProperty("damage", s.pendingBagDamage);
+				o.addProperty("speed", s.pendingBagSpeed);
+				sendAction("apply_bag_weapon", o);
+				return true;
+			}
 			if (this.primaryInput.keyPressed(keyCode, scanCode, modifiers)) {
 				return true;
 			}
@@ -3372,7 +3848,10 @@ public class HardcoreDashboardScreen extends Screen {
 			case 1 -> s.veinMiner || s.treeCapitator || s.veinAutoSmelt;
 			case 2 -> s.sneakGrow;
 			case 3 -> s.orePlusEnabled;
-			case 4 -> s.bypassEnchantConflicts;
+			case 4 -> (s.weaponStudioEnabled && (Math.abs(s.globalWeaponMultiplier - 1.0) > 1e-4
+					|| s.weaponCatalog.stream().anyMatch(w -> w.overridden)))
+					|| s.bagWeapons.stream().anyMatch(b -> b.customItem);
+			case 5 -> s.bypassEnchantConflicts;
 			default -> false;
 		};
 	}

@@ -38,6 +38,30 @@ public class ClientStateSnapshot {
 		public int enchantCount = 0;
 	}
 
+	public static class WeaponCatalogItem {
+		public String id = "";
+		public String name = "";
+		public String category = "sword";
+		public double vanillaDamage = 1.0;
+		public double vanillaSpeed = 1.6;
+		public double activeDamage = 1.0;
+		public double activeSpeed = 1.6;
+		public boolean overridden = false;
+	}
+
+	public static class BagWeaponItem {
+		public int slot = -1;
+		public String tag = "";
+		public String itemId = "";
+		public String name = "";
+		public double vanillaDamage = 1.0;
+		public double vanillaSpeed = 1.6;
+		public double currentDamage = 1.0;
+		public double currentSpeed = 1.6;
+		public boolean customItem = false;
+		public boolean catalogOverridden = false;
+	}
+
 	public static class WaypointItem {
 		public String id = "";
 		public String name = "";
@@ -102,6 +126,21 @@ public class ClientStateSnapshot {
 	public int uncraftSelectedSlot = -1;
 	public int uncraftBatches = 1;
 	public boolean uncraftSplitBooks = true;
+
+	// Weapon Damage Studio UI state
+	public int weaponStudioSubMode = 0; // 0 = All-Weapons Live Catalog, 1 = Bag & Hand Item Forge
+	public int weaponCategoryFilter = 0; // 0 = All, 1 = Swords, 2 = Axes & Mace, 3 = Ranged & Trident, 4 = Tools
+	public String selectedCatalogWeaponId = "minecraft:diamond_sword";
+	public double pendingCatalogDamage = 7.0;
+	public double pendingBagDamage = 7.0;
+	public double pendingBagSpeed = 1.6;
+	public int lastLoadedBagWeaponSlot = -99;
+	public boolean weaponStudioEnabled = true;
+	public double globalWeaponMultiplier = 1.0;
+	public int selectedWeaponSlot = -1;
+	public String selectedWeaponSlotLabel = "None";
+	public List<BagWeaponItem> bagWeapons = new ArrayList<>();
+	public List<WeaponCatalogItem> weaponCatalog = new ArrayList<>();
 
 	// Toast banner
 	public String toastText = "";
@@ -252,6 +291,62 @@ public class ClientStateSnapshot {
 				for (String k : HardcoreStateManager.ALL_ORE_KEYS) {
 					ores.put(k, bool(oo, k, true));
 				}
+			}
+
+			this.weaponStudioEnabled = bool(r, "weaponStudioEnabled", weaponStudioEnabled);
+			this.globalWeaponMultiplier = numDouble(r, "globalWeaponMultiplier", globalWeaponMultiplier);
+			int prevWeaponSlot = this.selectedWeaponSlot;
+			this.selectedWeaponSlot = numInt(r, "selectedWeaponSlot", selectedWeaponSlot);
+			this.selectedWeaponSlotLabel = str(r, "selectedWeaponSlotLabel", selectedWeaponSlotLabel);
+
+			if (r.has("bagWeapons") && r.get("bagWeapons").isJsonArray()) {
+				List<BagWeaponItem> nextBag = new ArrayList<>();
+				for (JsonElement el : r.get("bagWeapons").getAsJsonArray()) {
+					if (!el.isJsonObject()) continue;
+					JsonObject bo = el.getAsJsonObject();
+					BagWeaponItem bw = new BagWeaponItem();
+					bw.slot = numInt(bo, "slot", -1);
+					bw.tag = str(bo, "tag", "");
+					bw.itemId = str(bo, "itemId", "");
+					bw.name = str(bo, "name", "");
+					bw.vanillaDamage = numDouble(bo, "vanillaDamage", 1.0);
+					bw.vanillaSpeed = numDouble(bo, "vanillaSpeed", 1.6);
+					bw.currentDamage = numDouble(bo, "currentDamage", 1.0);
+					bw.currentSpeed = numDouble(bo, "currentSpeed", 1.6);
+					bw.customItem = bool(bo, "customItem", false);
+					bw.catalogOverridden = bool(bo, "catalogOverridden", false);
+					nextBag.add(bw);
+				}
+				this.bagWeapons = nextBag;
+				if (this.selectedWeaponSlot != prevWeaponSlot || this.lastLoadedBagWeaponSlot != this.selectedWeaponSlot) {
+					for (BagWeaponItem bw : this.bagWeapons) {
+						if (bw.slot == this.selectedWeaponSlot) {
+							this.pendingBagDamage = bw.currentDamage;
+							this.pendingBagSpeed = bw.currentSpeed;
+							this.lastLoadedBagWeaponSlot = this.selectedWeaponSlot;
+							break;
+						}
+					}
+				}
+			}
+
+			if (r.has("weaponCatalog") && r.get("weaponCatalog").isJsonArray()) {
+				List<WeaponCatalogItem> nextCat = new ArrayList<>();
+				for (JsonElement el : r.get("weaponCatalog").getAsJsonArray()) {
+					if (!el.isJsonObject()) continue;
+					JsonObject wo = el.getAsJsonObject();
+					WeaponCatalogItem wc = new WeaponCatalogItem();
+					wc.id = str(wo, "id", "");
+					wc.name = str(wo, "name", wc.id);
+					wc.category = str(wo, "category", "sword");
+					wc.vanillaDamage = numDouble(wo, "vanillaDamage", 1.0);
+					wc.vanillaSpeed = numDouble(wo, "vanillaSpeed", 1.6);
+					wc.activeDamage = numDouble(wo, "activeDamage", 1.0);
+					wc.activeSpeed = numDouble(wo, "activeSpeed", 1.6);
+					wc.overridden = bool(wo, "overridden", false);
+					nextCat.add(wc);
+				}
+				this.weaponCatalog = nextCat;
 			}
 
 			this.bypassEnchantConflicts = bool(r, "bypassEnchantConflicts", bypassEnchantConflicts);
